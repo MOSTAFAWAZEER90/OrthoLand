@@ -1,0 +1,150 @@
+@page "/branches"
+@rendermode InteractiveServer
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Branches - OrthoFlowAI</PageTitle>
+
+<div class="page-header">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Branches</MudText>
+        <MudText Typo="Typo.body2" Style="color:var(--text-secondary);margin-top:0.25rem;">
+            Manage clinic locations
+        </MudText>
+    </div>
+    <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" OnClick="OpenCreateDialog" Style="color:white;">
+        Add Branch
+    </MudButton>
+</div>
+
+@if (_loading)
+{
+    <LoadingSpinner Message="Loading branches..." />
+}
+else if (_branches.Count == 0)
+{
+    <div style="text-align:center;padding:3rem;">
+        <MudIcon Icon="@Icons.Material.Filled.Storefront" Size="Size.Large" Style="color:var(--text-tertiary);opacity:0.5;" />
+        <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);margin-top:0.5rem;">No branches yet.</MudText>
+    </div>
+}
+else
+{
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1rem;">
+        @foreach (var branch in _branches)
+        {
+            <MudCard Class="content-card">
+                <MudCardContent>
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:0.5rem;">
+                        <div style="display:flex;align-items:center;gap:0.75rem;">
+                            <div style="width:44px;height:44px;border-radius:10px;background:var(--accent-gradient);display:flex;align-items:center;justify-content:center;">
+                                <MudIcon Icon="@Icons.Material.Filled.Storefront" Size="Size.Small" Style="color:white;" />
+                            </div>
+                            <div>
+                                <MudText Typo="Typo.subtitle1" Style="font-weight:700;">@branch.Name</MudText>
+                                @if (branch.IsMainBranch)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Style="background:var(--info-light);color:var(--info);font-weight:600;">Main Branch</MudChip>
+                                }
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:0.25rem;">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenEditDialog(branch))" Title="Edit" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteBranch(branch))" Title="Delete" />
+                        </div>
+                    </div>
+                    @if (!string.IsNullOrEmpty(branch.Address))
+                    {
+                        <div style="display:flex;align-items:center;gap:0.5rem;margin-top:1rem;">
+                            <MudIcon Icon="@Icons.Material.Filled.Place" Size="Size.Small" Style="color:var(--text-tertiary);" />
+                            <MudText Typo="Typo.body2" Style="color:var(--text-secondary);">@branch.Address</MudText>
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(branch.Phone))
+                    {
+                        <div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem;">
+                            <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" Style="color:var(--text-tertiary);" />
+                            <MudText Typo="Typo.body2" Style="color:var(--text-secondary);">@branch.Phone</MudText>
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(branch.OperatingHours))
+                    {
+                        <div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem;">
+                            <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Style="color:var(--text-tertiary);" />
+                            <MudText Typo="Typo.body2" Style="color:var(--text-secondary);">@branch.OperatingHours</MudText>
+                        </div>
+                    }
+                </MudCardContent>
+            </MudCard>
+        }
+    </div>
+}
+
+@code {
+    private List<Branch> _branches = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBranches();
+    }
+
+    private async Task LoadBranches()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await ApiService.GetAsync<ApiResponse<PagedResult<Branch>>>("api/branches?pageNumber=1&pageSize=200");
+            _branches = result?.Data?.Items ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load branches: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters<BranchDialog> { { x => x.IsEdit, false } };
+        var dialog = await DialogService.ShowAsync<BranchDialog>("Add Branch", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadBranches();
+    }
+
+    private async Task OpenEditDialog(Branch branch)
+    {
+        var parameters = new DialogParameters<BranchDialog>
+        {
+            { x => x.IsEdit, true },
+            { x => x.Branch, branch }
+        };
+        var dialog = await DialogService.ShowAsync<BranchDialog>("Edit Branch", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadBranches();
+    }
+
+    private async Task DeleteBranch(Branch branch)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Title, "Delete Branch" },
+            { x => x.Message, $"Delete {branch.Name}?" },
+            { x => x.ConfirmText, "Delete" },
+            { x => x.OnConfirm, EventCallback.Factory.Create(this, async () =>
+            {
+                await ApiService.DeleteAsync<ApiResponse>($"api/branches/{branch.Id}");
+                await LoadBranches();
+            })}
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        await DialogService.ShowAsync<ConfirmDialog>("Delete Confirmation", parameters, options);
+    }
+}

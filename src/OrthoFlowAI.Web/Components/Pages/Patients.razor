@@ -1,0 +1,264 @@
+@page "/patients"
+@rendermode InteractiveServer
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+
+<PageTitle>Patients - OrthoFlowAI</PageTitle>
+
+<div class="page-header">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Patients</MudText>
+        <MudText Typo="Typo.body2" Style="color:var(--text-secondary);margin-top:0.25rem;">
+            Manage your patient records and treatment plans
+        </MudText>
+    </div>
+    <MudButton StartIcon="@Icons.Material.Filled.PersonAdd" Variant="Variant.Filled"
+               OnClick="OpenCreateDialog" Style="color:white;">
+        Add Patient
+    </MudButton>
+</div>
+
+<MudCard Class="content-card">
+    <div class="card-header" style="flex-wrap:wrap;gap:0.75rem;">
+        <div style="display:flex;align-items:center;gap:0.75rem;flex:1;flex-wrap:wrap;">
+            <MudTextField @bind-Value="_searchTerm"
+                          Placeholder="Search patients..."
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          IconSize="Size.Small"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Style="max-width:300px;min-width:200px;"
+                          Immediate="true"
+                          DebounceInterval="300"
+                          OnDebounceIntervalElapsed="Search" />
+
+            <MudSelect T="PatientStatus?" @bind-Value="_statusFilter" Label="Status"
+                       Variant="Variant.Outlined" Margin="Margin.Dense"
+                       Clearable="true" Style="min-width:150px;">
+                <MudSelectItem T="PatientStatus?" Value="null">All Statuses</MudSelectItem>
+                <MudSelectItem T="PatientStatus?" Value="PatientStatus.Active">Active</MudSelectItem>
+                <MudSelectItem T="PatientStatus?" Value="PatientStatus.Inactive">Inactive</MudSelectItem>
+                <MudSelectItem T="PatientStatus?" Value="PatientStatus.Completed">Completed</MudSelectItem>
+                <MudSelectItem T="PatientStatus?" Value="PatientStatus.OnHold">On Hold</MudSelectItem>
+                <MudSelectItem T="PatientStatus?" Value="PatientStatus.Cancelled">Cancelled</MudSelectItem>
+            </MudSelect>
+
+            <MudSelect T="TreatmentType?" @bind-Value="_treatmentFilter" Label="Treatment"
+                       Variant="Variant.Outlined" Margin="Margin.Dense"
+                       Clearable="true" Style="min-width:160px;">
+                <MudSelectItem T="TreatmentType?" Value="null">All Types</MudSelectItem>
+                <MudSelectItem T="TreatmentType?" Value="TreatmentType.Traditional">Traditional</MudSelectItem>
+                <MudSelectItem T="TreatmentType?" Value="TreatmentType.Ceramic">Ceramic</MudSelectItem>
+                <MudSelectItem T="TreatmentType?" Value="TreatmentType.Invisalign">Invisalign</MudSelectItem>
+                <MudSelectItem T="TreatmentType?" Value="TreatmentType.Lingual">Lingual</MudSelectItem>
+                <MudSelectItem T="TreatmentType?" Value="TreatmentType.Damon">Damon</MudSelectItem>
+            </MudSelect>
+        </div>
+    </div>
+
+    <MudTable T="PatientListResponse" @ref="_table"
+              Items="@_patients"
+              Hover="true" Dense="false"
+              Loading="@_loading"
+              LoadingProgressColor="Color.Primary"
+              FixedHeader="true"
+              Height="calc(100vh - 360px)"
+              OnRowClick="HandleRowClick">
+        <HeaderContent>
+            <MudTh Style="font-weight:600;">Patient</MudTh>
+            <MudTh Style="font-weight:600;">Phone</MudTh>
+            <MudTh Style="font-weight:600;">Status</MudTh>
+            <MudTh Style="font-weight:600;">Doctor</MudTh>
+            <MudTh Style="font-weight:600;">Treatment</MudTh>
+            <MudTh Style="font-weight:600;">Balance</MudTh>
+            <MudTh Style="font-weight:600;">Since</MudTh>
+            <MudTh Style="font-weight:600;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>
+                <div style="display:flex;align-items:center;gap:0.75rem;">
+                    <MudAvatar Size="Size.Small" Style="background:var(--accent-gradient);color:white;font-weight:600;font-size:0.75rem;">
+                        @($"{context.FirstName[0]}{context.LastName[0]}")
+                    </MudAvatar>
+                    <div>
+                        <MudText Typo="Typo.body2" Style="font-weight:600;">@($"{context.FirstName} {context.LastName}")</MudText>
+                        <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">@(context.Email ?? "No email")</MudText>
+                    </div>
+                </div>
+            </MudTd>
+            <MudTd>
+                <MudText Typo="Typo.body2">@(context.Phone ?? "—")</MudText>
+            </MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Style="@GetStatusStyle(context.Status)">
+                    @context.Status
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudText Typo="Typo.body2">@(context.DoctorName ?? "Unassigned")</MudText>
+            </MudTd>
+            <MudTd>
+                @if (context.TreatmentType.HasValue)
+                {
+                    <MudText Typo="Typo.body2">@context.TreatmentType</MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);">—</MudText>
+                }
+            </MudTd>
+            <MudTd>
+                <MudText Typo="Typo.body2" Style="font-weight:600;color:var(--danger);">
+                    @($"${context.AmountRemaining:N0}")
+                </MudText>
+            </MudTd>
+            <MudTd>
+                <MudText Typo="Typo.body2" Style="color:var(--text-secondary);">
+                    @context.CreatedAt.ToString("MMM dd, yyyy")
+                </MudText>
+            </MudTd>
+            <MudTd>
+                <div style="display:flex;gap:0.25rem;">
+                    <MudTooltip Text="View Profile">
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small"
+                                       OnClick="@(() => NavigateToPatient(context))"
+                                       Style="color:var(--accent-primary);" />
+                    </MudTooltip>
+                    <MudTooltip Text="Delete">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                       OnClick="@(() => ConfirmDelete(context))"
+                                       Style="color:var(--danger);" />
+                    </MudTooltip>
+                </div>
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 10, 25, 50, 100 }"
+                           HorizontalAlignment="HorizontalAlignment.End" />
+        </PagerContent>
+    </MudTable>
+</MudCard>
+
+@code {
+    private MudTable<PatientListResponse>? _table;
+    private List<PatientListResponse> _patients = new();
+    private bool _loading = true;
+    private string _searchTerm = "";
+    private PatientStatus? _statusFilter;
+    private TreatmentType? _treatmentFilter;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPatients();
+    }
+
+    private async Task LoadPatients()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var filter = new PatientFilterRequest
+            {
+                PageNumber = 1,
+                PageSize = 50,
+                SearchTerm = string.IsNullOrWhiteSpace(_searchTerm) ? null : _searchTerm,
+                Status = _statusFilter,
+                TreatmentType = _treatmentFilter
+            };
+
+            var result = await ApiService.PostAsync<PaginatedApiResponse<PatientListResponse>>("api/patients/filter", filter);
+            if (result?.Success == true)
+            {
+                _patients = result.Data;
+            }
+            else
+            {
+                _patients = new();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load patients: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Search()
+    {
+        await LoadPatients();
+    }
+
+    private void NavigateToPatient(PatientListResponse patient)
+    {
+        Navigation.NavigateTo($"/patients/{patient.Id}");
+    }
+
+    private void HandleRowClick(TableRowClickEventArgs<PatientListResponse> args)
+    {
+        if (args.Item != null)
+        {
+            NavigateToPatient(args.Item);
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters<PatientDialog>
+        {
+            { x => x.IsEdit, false },
+            { x => x.Model, new CreatePatientRequest() }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<PatientDialog>("New Patient", parameters, options);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadPatients();
+        }
+    }
+
+    private async Task ConfirmDelete(PatientListResponse patient)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Title, "Delete Patient" },
+            { x => x.Message, $"Are you sure you want to delete {patient.FirstName} {patient.LastName}? This action cannot be undone." },
+            { x => x.ConfirmText, "Delete" },
+            { x => x.OnConfirm, EventCallback.Factory.Create(this, async () =>
+            {
+                var result = await ApiService.DeleteAsync<object>($"api/patients/{patient.Id}");
+                if (result != null)
+                {
+                    Snackbar.Add("Patient deleted successfully", Severity.Success);
+                    await LoadPatients();
+                }
+                else
+                {
+                    Snackbar.Add("Failed to delete patient", Severity.Error);
+                }
+            })}
+        };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        await DialogService.ShowAsync<ConfirmDialog>("Delete Confirmation", parameters, options);
+    }
+
+    private string GetStatusStyle(PatientStatus status) => status switch
+    {
+        PatientStatus.Active => "background:var(--success-light);color:var(--success);font-weight:600;",
+        PatientStatus.Inactive => "background:var(--warning-light);color:var(--warning);font-weight:600;",
+        PatientStatus.Completed => "background:var(--info-light);color:var(--info);font-weight:600;",
+        PatientStatus.OnHold => "background:rgba(156,163,175,0.15);color:#6b7280;font-weight:600;",
+        PatientStatus.Cancelled => "background:var(--danger-light);color:var(--danger);font-weight:600;",
+        _ => "background:var(--bg-tertiary);"
+    };
+}

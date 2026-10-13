@@ -1,0 +1,149 @@
+@page "/staff"
+@rendermode InteractiveServer
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Staff - OrthoFlowAI</PageTitle>
+
+<div class="page-header">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Staff</MudText>
+        <MudText Typo="Typo.body2" Style="color:var(--text-secondary);margin-top:0.25rem;">
+            Manage your clinical team
+        </MudText>
+    </div>
+    <MudButton StartIcon="@Icons.Material.Filled.PersonAdd" Variant="Variant.Filled" OnClick="OpenCreateDialog" Style="color:white;">
+        Add Staff
+    </MudButton>
+</div>
+
+@if (_loading)
+{
+    <LoadingSpinner Message="Loading staff..." />
+}
+else if (_staff.Count == 0)
+{
+    <div style="text-align:center;padding:3rem;">
+        <MudIcon Icon="@Icons.Material.Filled.Badge" Size="Size.Large" Style="color:var(--text-tertiary);opacity:0.5;" />
+        <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);margin-top:0.5rem;">No staff found.</MudText>
+    </div>
+}
+else
+{
+    <MudCard Class="content-card">
+        <MudTable T="StaffResponse" Items="@_staff" Hover="true" Dense="false"
+                  Loading="@_loading" LoadingProgressColor="Color.Primary" FixedHeader="true"
+                  Height="calc(100vh - 320px)">
+            <HeaderContent>
+                <MudTh Style="font-weight:600;">Name</MudTh>
+                <MudTh Style="font-weight:600;">Role</MudTh>
+                <MudTh Style="font-weight:600;">Position</MudTh>
+                <MudTh Style="font-weight:600;">Department</MudTh>
+                <MudTh Style="font-weight:600;">Status</MudTh>
+                <MudTh Style="font-weight:600;">Hire Date</MudTh>
+                <MudTh Style="font-weight:600;">Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Name">
+                    <div style="display:flex;align-items:center;gap:0.6rem;">
+                        <MudAvatar Size="Size.Small" Style="background:var(--accent-gradient);color:white;font-weight:600;">
+                            @(string.IsNullOrEmpty(context.FullName) ? "?" : $"{context.FullName[0]}")
+                        </MudAvatar>
+                        <MudText Typo="Typo.body2" Style="font-weight:600;">@context.FullName</MudText>
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="Role">@context.Role</MudTd>
+                <MudTd DataLabel="Position">@(context.Position ?? "—")</MudTd>
+                <MudTd DataLabel="Department">@(context.Department ?? "—")</MudTd>
+                <MudTd DataLabel="Status">
+                    <MudChip T="string" Style="@GetStatusStyle(context.Status)">@context.Status</MudChip>
+                </MudTd>
+                <MudTd DataLabel="Hire Date">@(context.HireDate?.ToString("MMM dd, yyyy") ?? "—")</MudTd>
+                <MudTd DataLabel="Actions">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenEditDialog(context))" Title="Edit" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteStaff(context))" Title="Remove" />
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);text-align:center;padding:2rem;">No staff found.</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudCard>
+}
+
+@code {
+    private List<StaffResponse> _staff = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStaff();
+    }
+
+    private async Task LoadStaff()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await ApiService.GetAsync<ApiResponse<PagedResult<StaffResponse>>>("api/staff?pageNumber=1&pageSize=200");
+            _staff = result?.Data?.Items ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load staff: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters<StaffDialog> { { x => x.IsEdit, false } };
+        var dialog = await DialogService.ShowAsync<StaffDialog>("Add Staff", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadStaff();
+    }
+
+    private async Task OpenEditDialog(StaffResponse s)
+    {
+        var parameters = new DialogParameters<StaffDialog>
+        {
+            { x => x.IsEdit, true },
+            { x => x.Staff, s }
+        };
+        var dialog = await DialogService.ShowAsync<StaffDialog>("Edit Staff", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadStaff();
+    }
+
+    private async Task DeleteStaff(StaffResponse s)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Title, "Remove Staff" },
+            { x => x.Message, $"Remove {s.FullName} from the team?" },
+            { x => x.ConfirmText, "Remove" },
+            { x => x.OnConfirm, EventCallback.Factory.Create(this, async () =>
+            {
+                await ApiService.DeleteAsync<ApiResponse>($"api/staff/{s.Id}");
+                await LoadStaff();
+            })}
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        await DialogService.ShowAsync<ConfirmDialog>("Remove Confirmation", parameters, options);
+    }
+
+    private string GetStatusStyle(StaffStatus status) => status switch
+    {
+        StaffStatus.Active => "background:var(--success-light);color:var(--success);font-weight:600;",
+        StaffStatus.OnLeave => "background:var(--warning-light);color:var(--warning);font-weight:600;",
+        StaffStatus.Terminated => "background:var(--danger-light);color:var(--danger);font-weight:600;",
+        _ => "background:var(--bg-tertiary);color:var(--text-secondary);"
+    };
+}

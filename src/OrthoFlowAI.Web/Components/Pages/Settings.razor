@@ -1,0 +1,302 @@
+@page "/settings"
+@rendermode InteractiveServer
+@inject ISnackbar Snackbar
+
+<PageTitle>Settings - OrthoFlowAI</PageTitle>
+
+<div class="page-header">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Settings</MudText>
+        <MudText Typo="Typo.body2" Style="color:var(--text-secondary);margin-top:0.25rem;">
+            Manage your clinic profile and preferences
+        </MudText>
+    </div>
+</div>
+
+<MudGrid >
+    <MudItem xs="12" md="3">
+        <MudCard Class="content-card" Style="position:sticky;top:calc(var(--topbar-height) + 1.5rem);">
+            <div style="padding:0.75rem;">
+                <MudNavMenu>
+                    <MudNavLink Icon="@Icons.Material.Filled.Business"
+                                 ActiveClass="@(ActiveSection == 0 ? "active" : null)" OnClick="@(() => ActiveSection = 0)">
+                        Clinic Profile
+                    </MudNavLink>
+                    <MudNavLink Icon="@Icons.Material.Filled.Palette"
+                                 ActiveClass="@(ActiveSection == 1 ? "active" : null)" OnClick="@(() => ActiveSection = 1)">
+                        Branding
+                    </MudNavLink>
+                    <MudNavLink Icon="@Icons.Material.Filled.Schedule"
+                                 ActiveClass="@(ActiveSection == 2 ? "active" : null)" OnClick="@(() => ActiveSection = 2)">
+                        Business Hours
+                    </MudNavLink>
+                    <MudNavLink Icon="@Icons.Material.Filled.Notifications"
+                                 ActiveClass="@(ActiveSection == 3 ? "active" : null)" OnClick="@(() => ActiveSection = 3)">
+                        Notifications
+                    </MudNavLink>
+                    <MudNavLink Icon="@Icons.Material.Filled.Security"
+                                 ActiveClass="@(ActiveSection == 4 ? "active" : null)" OnClick="@(() => ActiveSection = 4)">
+                        Security
+                    </MudNavLink>
+                </MudNavMenu>
+            </div>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" md="9">
+        @if (ActiveSection == 0)
+        {
+            <MudCard Class="content-card">
+                <div class="card-header">
+                    <MudText Typo="Typo.h6" Style="font-weight:600;">Clinic Profile</MudText>
+                </div>
+                <div class="card-body">
+                    <MudGrid >
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_clinicName" Label="Clinic Name"
+                                          Variant="Variant.Outlined" FullWidth="true" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_clinicEmail" Label="Email"
+                                          Variant="Variant.Outlined" FullWidth="true" InputType="InputType.Email" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_clinicPhone" Label="Phone"
+                                          Variant="Variant.Outlined" FullWidth="true" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_clinicWebsite" Label="Website"
+                                          Variant="Variant.Outlined" FullWidth="true" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_clinicAddress" Label="Address"
+                                          Variant="Variant.Outlined" FullWidth="true" Lines="2" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_clinicDescription" Label="Description"
+                                          Variant="Variant.Outlined" FullWidth="true" Lines="3" />
+                        </MudItem>
+                    </MudGrid>
+                    <div style="margin-top:1.5rem;display:flex;justify-content:flex-end;">
+                        <MudButton Variant="Variant.Filled" Style="color:white;"
+                                   OnClick="SaveClinicProfile">Save Changes</MudButton>
+                    </div>
+                </div>
+            </MudCard>
+        }
+        else if (ActiveSection == 1)
+        {
+            <MudCard Class="content-card">
+                <div class="card-header">
+                    <MudText Typo="Typo.h6" Style="font-weight:600;">Branding</MudText>
+                </div>
+                <div class="card-body">
+                    <MudText Typo="Typo.body2" Style="color:var(--text-secondary);margin-bottom:1.5rem;">
+                        Customize the look and feel of your clinic's patient-facing pages.
+                    </MudText>
+                    <MudGrid >
+                        <MudItem xs="12" sm="6">
+                            <MudText Typo="Typo.body2" Style="font-weight:600;margin-bottom:0.5rem;">Primary Color</MudText>
+                            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                                @foreach (var color in _brandColors)
+                                {
+                                    <div style="width:36px;height:36px;border-radius:8px;background:@color;cursor:pointer;border:2px solid @(color == _selectedBrandColor ? "var(--text-primary)" : "transparent");transition:all var(--transition-fast);"
+                                         @onclick="@(() => _selectedBrandColor = color)"></div>
+                                }
+                            </div>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="string" @bind-Value="_brandFont" Label="Font Family"
+                                       Variant="Variant.Outlined" FullWidth="true">
+                                <MudSelectItem Value="@("Inter")">Inter</MudSelectItem>
+                                <MudSelectItem Value="@("Poppins")">Poppins</MudSelectItem>
+                                <MudSelectItem Value="@("Roboto")">Roboto</MudSelectItem>
+                                <MudSelectItem Value="@("Open Sans")">Open Sans</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                    </MudGrid>
+                    <div style="margin-top:1.5rem;display:flex;justify-content:flex-end;">
+                        <MudButton Variant="Variant.Filled" Style="color:white;"
+                                   OnClick="SaveBranding">Save Changes</MudButton>
+                    </div>
+                </div>
+            </MudCard>
+        }
+        else if (ActiveSection == 2)
+        {
+            <MudCard Class="content-card">
+                <div class="card-header">
+                    <MudText Typo="Typo.h6" Style="font-weight:600;">Business Hours</MudText>
+                </div>
+                <div class="card-body">
+                    @foreach (var day in _businessHours)
+                    {
+                        <div style="display:flex;align-items:center;gap:1rem;padding:0.75rem 0;border-bottom:1px solid var(--border-light);">
+                            <MudCheckBox @bind-Value="day.IsEnabled" Color="Color.Primary" />
+                            <MudText Typo="Typo.body2" Style="font-weight:600;min-width:100px;">@day.Day</MudText>
+                            @if (day.IsEnabled)
+                            {
+                                <MudTimePicker @bind-Time="day.OpenTime" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                               Style="max-width:120px;" />
+                                <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);">to</MudText>
+                                <MudTimePicker @bind-Time="day.CloseTime" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                               Style="max-width:120px;" />
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);">Closed</MudText>
+                            }
+                        </div>
+                    }
+                    <div style="margin-top:1.5rem;display:flex;justify-content:flex-end;">
+                        <MudButton Variant="Variant.Filled" Style="color:white;"
+                                   OnClick="SaveBusinessHours">Save Changes</MudButton>
+                    </div>
+                </div>
+            </MudCard>
+        }
+        else if (ActiveSection == 3)
+        {
+            <MudCard Class="content-card">
+                <div class="card-header">
+                    <MudText Typo="Typo.h6" Style="font-weight:600;">Notification Preferences</MudText>
+                </div>
+                <div class="card-body">
+                    <div style="display:flex;flex-direction:column;gap:1rem;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;border-bottom:1px solid var(--border-light);">
+                            <div>
+                                <MudText Typo="Typo.body2" Style="font-weight:600;">Appointment Reminders</MudText>
+                                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Send reminders before appointments</MudText>
+                            </div>
+                            <MudSwitch @bind-Value="_notifReminders" Color="Color.Primary" />
+                        </div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;border-bottom:1px solid var(--border-light);">
+                            <div>
+                                <MudText Typo="Typo.body2" Style="font-weight:600;">Payment Alerts</MudText>
+                                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Get notified about payments and overdue invoices</MudText>
+                            </div>
+                            <MudSwitch @bind-Value="_notifPayments" Color="Color.Primary" />
+                        </div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;border-bottom:1px solid var(--border-light);">
+                            <div>
+                                <MudText Typo="Typo.body2" Style="font-weight:600;">Daily Reports</MudText>
+                                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Receive daily clinic summary reports</MudText>
+                            </div>
+                            <MudSwitch @bind-Value="_notifReports" Color="Color.Primary" />
+                        </div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;">
+                            <div>
+                                <MudText Typo="Typo.body2" Style="font-weight:600;">Patient Messages</MudText>
+                                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Notifications for new patient messages</MudText>
+                            </div>
+                            <MudSwitch @bind-Value="_notifMessages" Color="Color.Primary" />
+                        </div>
+                    </div>
+                    <div style="margin-top:1.5rem;display:flex;justify-content:flex-end;">
+                        <MudButton Variant="Variant.Filled" Style="color:white;"
+                                   OnClick="SaveNotifications">Save Changes</MudButton>
+                    </div>
+                </div>
+            </MudCard>
+        }
+        else if (ActiveSection == 4)
+        {
+            <MudCard Class="content-card">
+                <div class="card-header">
+                    <MudText Typo="Typo.h6" Style="font-weight:600;">Security</MudText>
+                </div>
+                <div class="card-body">
+                    <MudText Typo="Typo.h6" Style="font-weight:600;margin-bottom:1rem;">Change Password</MudText>
+                    <MudGrid >
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_currentPassword" Label="Current Password"
+                                          Variant="Variant.Outlined" FullWidth="true" InputType="InputType.Password" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6"></MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_newPassword" Label="New Password"
+                                          Variant="Variant.Outlined" FullWidth="true" InputType="InputType.Password" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_confirmPassword" Label="Confirm New Password"
+                                          Variant="Variant.Outlined" FullWidth="true" InputType="InputType.Password" />
+                        </MudItem>
+                    </MudGrid>
+                    <div style="margin-top:1.5rem;display:flex;justify-content:flex-end;">
+                        <MudButton Variant="Variant.Filled" Style="color:white;"
+                                   OnClick="ChangePassword">Update Password</MudButton>
+                    </div>
+                </div>
+            </MudCard>
+        }
+    </MudItem>
+</MudGrid>
+
+@code {
+    private int ActiveSection = 0;
+
+    private string _clinicName = "OrthoFlowAI Clinic";
+    private string _clinicEmail = "info@orthoflowai.com";
+    private string _clinicPhone = "+1 (555) 123-4567";
+    private string _clinicWebsite = "https://orthoflowai.com";
+    private string _clinicAddress = "123 Dental Avenue, Suite 100";
+    private string _clinicDescription = "Modern orthodontic practice providing quality dental care.";
+
+    private string _selectedBrandColor = "#6366f1";
+    private string _brandFont = "Inter";
+    private List<string> _brandColors = new() { "#6366f1", "#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#06b6d4" };
+
+    private bool _notifReminders = true;
+    private bool _notifPayments = true;
+    private bool _notifReports = false;
+    private bool _notifMessages = true;
+
+    private string _currentPassword = "";
+    private string _newPassword = "";
+    private string _confirmPassword = "";
+
+    private List<BusinessHour> _businessHours = new()
+    {
+        new("Monday", true, new TimeSpan(9, 0, 0), new TimeSpan(17, 0, 0)),
+        new("Tuesday", true, new TimeSpan(9, 0, 0), new TimeSpan(17, 0, 0)),
+        new("Wednesday", true, new TimeSpan(9, 0, 0), new TimeSpan(17, 0, 0)),
+        new("Thursday", true, new TimeSpan(9, 0, 0), new TimeSpan(17, 0, 0)),
+        new("Friday", true, new TimeSpan(9, 0, 0), new TimeSpan(15, 0, 0)),
+        new("Saturday", false, new TimeSpan(9, 0, 0), new TimeSpan(13, 0, 0)),
+        new("Sunday", false, new TimeSpan(0, 0, 0), new TimeSpan(0, 0, 0)),
+    };
+
+    private void SaveClinicProfile() => Snackbar.Add("Clinic profile saved successfully!", Severity.Success);
+    private void SaveBranding() => Snackbar.Add("Branding settings saved!", Severity.Success);
+    private void SaveBusinessHours() => Snackbar.Add("Business hours saved!", Severity.Success);
+    private void SaveNotifications() => Snackbar.Add("Notification preferences saved!", Severity.Success);
+
+    private void ChangePassword()
+    {
+        if (string.IsNullOrEmpty(_newPassword) || _newPassword != _confirmPassword)
+        {
+            Snackbar.Add("Passwords do not match", Severity.Error);
+            return;
+        }
+        Snackbar.Add("Password changed successfully!", Severity.Success);
+        _currentPassword = "";
+        _newPassword = "";
+        _confirmPassword = "";
+    }
+
+    class BusinessHour
+    {
+        public string Day { get; set; } = "";
+        public bool IsEnabled { get; set; }
+        public TimeSpan? OpenTime { get; set; }
+        public TimeSpan? CloseTime { get; set; }
+
+        public BusinessHour(string day, bool isEnabled, TimeSpan open, TimeSpan close)
+        {
+            Day = day;
+            IsEnabled = isEnabled;
+            OpenTime = open;
+            CloseTime = close;
+        }
+    }
+}

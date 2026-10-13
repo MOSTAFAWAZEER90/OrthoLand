@@ -1,0 +1,339 @@
+@page "/super-admin"
+@attribute [Authorize(Roles = "SuperAdmin")]
+@rendermode InteractiveServer
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@using OrthoFlowAI.Web.Models
+
+<PageTitle>Super Admin - OrthoFlowAI</PageTitle>
+
+<div class="page-header">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Super Admin Panel</MudText>
+        <MudText Typo="Typo.body2" Style="color:var(--text-secondary);margin-top:0.25rem;">
+            Multi-clinic management and system oversight
+        </MudText>
+    </div>
+    <div style="display:flex;gap:0.5rem;">
+        <MudButton StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Outlined" Size="Size.Small"
+                   OnClick="LoadData">
+            Refresh
+        </MudButton>
+        <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Style="color:white;"
+                   OnClick="OpenCreateClinicDialog">
+            New Clinic
+        </MudButton>
+    </div>
+</div>
+
+@if (_loading)
+{
+    <LoadingSpinner Message="Loading clinics..." />
+}
+else
+{
+    <div class="fade-in">
+        <MudGrid Style="margin-bottom:1.5rem;">
+            <MudItem xs="12" sm="6" md="3">
+                <StatCard Icon="@Icons.Material.Filled.LocalHospital"
+                          Value="@(_stats?.TotalClinics.ToString("N0") ?? "0")"
+                          Label="Total Clinics"
+                          Color="primary"
+                          Trend="@($"+{_stats?.ActiveClinics ?? 0} active")"
+                          TrendUp="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <StatCard Icon="@Icons.Material.Filled.People"
+                          Value="@(_stats?.TotalPatients.ToString("N0") ?? "0")"
+                          Label="Total Patients"
+                          Color="info" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <StatCard Icon="@Icons.Material.Filled.MedicalServices"
+                          Value="@(_stats?.TotalDoctors.ToString("N0") ?? "0")"
+                          Label="Total Doctors"
+                          Color="success" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <StatCard Icon="@Icons.Material.Filled.AttachMoney"
+                          Value="@($"${_stats?.TotalRevenue:N0}" ?? "$0")"
+                          Label="Total Revenue"
+                          Color="warning"
+                          Trend="@($"${_stats?.MonthlyRevenue:N0}/mo")"
+                          TrendUp="true" />
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudCard Class="content-card">
+                    <div class="card-header">
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+                            <div>
+                                <MudText Typo="Typo.h6" Style="font-weight:600;">Clinics Management</MudText>
+                                <MudText Typo="Typo.body2" Style="color:var(--text-secondary);">All clinics in the system</MudText>
+                            </div>
+                            <MudTextField @bind-Value="_filter" Placeholder="Search clinics..." Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true"
+                                          Style="width:300px;" />
+                        </div>
+                    </div>
+                    <div style="padding:0 1.5rem 1.5rem;">
+                        <MudTable Items="@_filteredClinics" RowsPerPage="10" RowsPerPageOptions="new int[] { 10, 25, 50 }"
+                                  SortLabel="Sort by" ShowProgressIndicator="true"
+                                  Dense="true" Hover="true" Striped="true" MultiSelection="false"
+                                  Style="min-width:800px;">
+                            <HeaderContent>
+                                <MudTh>Clinic</MudTh>
+                                <MudTh>Location</MudTh>
+                                <MudTh>Plan</MudTh>
+                                <MudTh>Status</MudTh>
+                                <MudTh>Patients</MudTh>
+                                <MudTh>Doctors</MudTh>
+                                <MudTh>Revenue</MudTh>
+                                <MudTh>Actions</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Clinic">
+                                    <div style="display:flex;align-items:center;gap:0.75rem;">
+                                        <MudAvatar Style="width:36px;height:36px;background:var(--accent-gradient);color:white;font-weight:600;font-size:0.875rem;">
+                                            @(context.Name.Length >= 2 ? context.Name[..2].ToUpper() : context.Name.ToUpper())
+                                        </MudAvatar>
+                                        <div>
+                                            <MudText Typo="Typo.body2" Style="font-weight:600;">@context.Name</MudText>
+                                            <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">@context.Id[..8]...</MudText>
+                                        </div>
+                                    </div>
+                                </MudTd>
+                                <MudTd DataLabel="Location">
+                                    <MudText Typo="Typo.body2">@context.City, @context.Country</MudText>
+                                </MudTd>
+                                <MudTd DataLabel="Plan">
+                                    <MudChip T="string" Style="@GetPlanStyle(context.SubscriptionPlan)">@context.SubscriptionPlan</MudChip>
+                                </MudTd>
+                                <MudTd DataLabel="Status">
+                                    <MudChip T="string" Style="@GetStatusStyle(context.SubscriptionStatus, context.IsActive)">@(context.IsActive ? context.SubscriptionStatus : "Inactive")</MudChip>
+                                </MudTd>
+                                <MudTd DataLabel="Patients">
+                                    <MudText Typo="Typo.body2">@context.TotalPatients</MudText>
+                                </MudTd>
+                                <MudTd DataLabel="Doctors">
+                                    <MudText Typo="Typo.body2">@context.TotalDoctors</MudText>
+                                </MudTd>
+                                <MudTd DataLabel="Revenue">
+                                    <MudText Typo="Typo.body2" Style="font-weight:600;color:var(--success);">$@context.TotalRevenue.ToString("N0")</MudText>
+                                </MudTd>
+                                <MudTd DataLabel="Actions">
+                                    <div style="display:flex;gap:0.25rem;">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small"
+                                                       OnClick="@(() => ViewClinic(context.Id))"
+                                                       Style="color:var(--text-secondary);" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                                       OnClick="@(() => EditClinic(context))"
+                                                       Style="color:var(--accent-primary);" />
+                                        <MudIconButton Icon="@(context.IsActive ? Icons.Material.Filled.Block : Icons.Material.Filled.CheckCircle)" Size="Size.Small"
+                                                       OnClick="@(() => ToggleClinicStatus(context.Id, context.IsActive))"
+                                                       Style="@GetToggleButtonStyle(context.IsActive)" />
+                                    </div>
+                                </MudTd>
+                            </RowTemplate>
+                            <PagerContent>
+                                <MudTablePager />
+                            </PagerContent>
+                        </MudTable>
+                    </div>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudCard Class="content-card" Style="margin-bottom:1.5rem;">
+                    <div class="card-header">
+                        <MudText Typo="Typo.h6" Style="font-weight:600;">Subscriptions by Plan</MudText>
+                    </div>
+                    <div style="padding:1rem 1.5rem;">
+                        @if (_stats?.SubscriptionsByPlan?.Any() == true)
+                        {
+                            @foreach (var plan in _stats.SubscriptionsByPlan)
+                            {
+                                <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0;border-bottom:1px solid var(--border-light);">
+                                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                                        <MudChip T="string" Size="Size.Small" Style="@GetPlanStyle(plan.Plan)" Class="mud-chip-clickable">@plan.Plan</MudChip>
+                                    </div>
+                                    <MudText Typo="Typo.body2" Style="font-weight:600;">@plan.Count</MudText>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);text-align:center;padding:1rem;">No subscription data</MudText>
+                        }
+                    </div>
+                </MudCard>
+
+                <MudCard Class="content-card">
+                    <div class="card-header">
+                        <MudText Typo="Typo.h6" Style="font-weight:600;">Top Clinics by Revenue</MudText>
+                    </div>
+                    <div style="padding:0.5rem 1.5rem 1.5rem;">
+                        @if (_stats?.TopClinicsByRevenue?.Any() == true)
+                        {
+                            @foreach (var clinic in _stats.TopClinicsByRevenue)
+                            {
+                                <div style="display:flex;align-items:center;gap:0.75rem;padding:0.625rem 0;border-bottom:1px solid var(--border-light);">
+                                    <MudAvatar Size="Size.Small" Style="background:var(--accent-gradient);color:white;font-weight:600;font-size:0.75rem;">
+                                        @(clinic.ClinicName.Length >= 2 ? clinic.ClinicName[..2].ToUpper() : clinic.ClinicName.ToUpper())
+                                    </MudAvatar>
+                                    <div style="flex:1;min-width:0;">
+                                        <MudText Typo="Typo.body2" Style="font-weight:600;">@clinic.ClinicName</MudText>
+                                        <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">@clinic.PatientCount patients</MudText>
+                                    </div>
+                                    <MudText Typo="Typo.body2" Style="font-weight:600;color:var(--success);">
+                                        $@clinic.Revenue.ToString("N0")
+                                    </MudText>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);text-align:center;padding:1rem;">No revenue data</MudText>
+                        }
+                    </div>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    </div>
+}
+
+@code {
+    private SuperAdminStatsResponse? _stats;
+    private List<ClinicSummaryResponse> _clinics = new();
+    private List<ClinicSummaryResponse> _filteredClinics = new();
+    private bool _loading = true;
+    private string _filter = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var statsResult = await ApiService.GetAsync<ApiResponse<SuperAdminStatsResponse>>("api/super-admin/clinics/stats");
+            if (statsResult?.Success == true)
+            {
+                _stats = statsResult.Data;
+            }
+
+            var clinicsResult = await ApiService.GetAsync<ApiResponse<PagedResult<ClinicSummaryResponse>>>("api/super-admin/clinics?pageNumber=1&pageSize=100");
+            if (clinicsResult?.Success == true && clinicsResult.Data != null)
+            {
+                _clinics = clinicsResult.Data.Items;
+                _filteredClinics = _clinics;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load data: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OnFilterChanged(string value)
+    {
+        _filter = value;
+        _filteredClinics = string.IsNullOrWhiteSpace(_filter)
+            ? _clinics
+            : _clinics.Where(c => c.Name.Contains(_filter, StringComparison.OrdinalIgnoreCase)
+                               || c.City.Contains(_filter, StringComparison.OrdinalIgnoreCase)
+                               || c.Country.Contains(_filter, StringComparison.OrdinalIgnoreCase)
+                               || c.SubscriptionPlan.Contains(_filter, StringComparison.OrdinalIgnoreCase))
+                       .ToList();
+    }
+
+    private async Task ViewClinic(string clinicId)
+    {
+        var result = await ApiService.GetAsync<ApiResponse<ClinicDetailResponse>>($"api/super-admin/clinics/{clinicId}");
+        if (result?.Success == true && result.Data != null)
+        {
+            var parameters = new DialogParameters<ClinicDetailDialog>
+            {
+                { x => x.Clinic, result.Data }
+            };
+            await DialogService.ShowAsync<ClinicDetailDialog>($"Clinic: {result.Data.Name}", parameters, new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        }
+    }
+
+    private async Task EditClinic(ClinicSummaryResponse clinic)
+    {
+        var parameters = new DialogParameters<CreateEditClinicDialog>
+        {
+            { x => x.Clinic, clinic },
+            { x => x.IsEdit, true }
+        };
+        var dialog = await DialogService.ShowAsync<CreateEditClinicDialog>($"Edit Clinic: {clinic.Name}", parameters, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadData();
+        }
+    }
+
+    private async Task OpenCreateClinicDialog()
+    {
+        var dialog = await DialogService.ShowAsync<CreateEditClinicDialog>("Create New Clinic", new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadData();
+        }
+    }
+
+    private async Task ToggleClinicStatus(string clinicId, bool currentStatus)
+    {
+        var result = await ApiService.PostAsync<ApiResponse>($"api/super-admin/clinics/{clinicId}/toggle-status", new { });
+        if (result?.Success == true)
+        {
+            Snackbar.Add($"Clinic {(currentStatus ? "deactivated" : "activated")}", Severity.Success);
+            await LoadData();
+        }
+        else
+        {
+            Snackbar.Add(result?.Message ?? "Failed to toggle status", Severity.Error);
+        }
+    }
+
+    private string GetPlanStyle(string? plan) => plan switch
+    {
+        "Starter" => "background:var(--info-light);color:var(--info);font-weight:600;",
+        "Professional" => "background:var(--primary-light);color:var(--primary);font-weight:600;",
+        "Enterprise" => "background:var(--warning-light);color:var(--warning);font-weight:600;",
+        _ => "background:var(--bg-tertiary);"
+    };
+
+    private string GetStatusStyle(string? status, bool isActive)
+    {
+        if (!isActive) return "background:var(--bg-tertiary);color:var(--text-tertiary);font-weight:600;";
+        return status switch
+        {
+            "Active" => "background:var(--success-light);color:var(--success);font-weight:600;",
+            "Trial" => "background:var(--warning-light);color:var(--warning);font-weight:600;",
+            "Expired" or "Cancelled" => "background:var(--danger-light);color:var(--danger);font-weight:600;",
+            _ => "background:var(--info-light);color:var(--info);font-weight:600;"
+        };
+    }
+
+    private string GetToggleButtonStyle(bool isActive)
+    {
+        return isActive ? "color:var(--warning);" : "color:var(--success);";
+    }
+}

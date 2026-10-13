@@ -1,0 +1,388 @@
+@page "/ai"
+@rendermode InteractiveServer
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+
+<PageTitle>AI Assistant - OrthoFlowAI</PageTitle>
+
+<div class="page-header">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">AI Assistant</MudText>
+        <MudText Typo="Typo.body2" Style="color:var(--text-secondary);margin-top:0.25rem;">
+            AI-powered treatment planning and insights
+        </MudText>
+    </div>
+</div>
+
+<MudGrid >
+    <MudItem xs="12" md="4">
+        <MudCard Class="content-card" Style="margin-bottom:1.5rem;">
+            <div class="card-header">
+                <MudText Typo="Typo.h6" Style="font-weight:600;">AI Tools</MudText>
+            </div>
+            <div style="padding:0.5rem 1.5rem 1.5rem;display:flex;flex-direction:column;gap:0.5rem;">
+                <MudButton StartIcon="@Icons.Material.Filled.AutoAwesome" Variant="Variant.Outlined"
+                           FullWidth="true" Style="justify-content:flex-start;text-transform:none;"
+                           OnClick="@(() => _selectedTool = "treatment")">
+                    <div style="text-align:left;">
+                        <div style="font-weight:600;">Treatment Plan Generator</div>
+                        <div style="font-size:0.75rem;color:var(--text-tertiary);">Generate personalized treatment plans</div>
+                    </div>
+                </MudButton>
+                <MudButton StartIcon="@Icons.Material.Filled.Psychology" Variant="Variant.Outlined"
+                           FullWidth="true" Style="justify-content:flex-start;text-transform:none;"
+                           OnClick="@(() => _selectedTool = "analysis")">
+                    <div style="text-align:left;">
+                        <div style="font-weight:600;">Patient Analysis</div>
+                        <div style="font-size:0.75rem;color:var(--text-tertiary);">AI-driven patient risk assessment</div>
+                    </div>
+                </MudButton>
+                <MudButton StartIcon="@Icons.Material.Filled.Chat" Variant="Variant.Outlined"
+                           FullWidth="true" Style="justify-content:flex-start;text-transform:none;"
+                           OnClick="@(() => _selectedTool = "chat")">
+                    <div style="text-align:left;">
+                        <div style="font-weight:600;">Clinical Chat</div>
+                        <div style="font-size:0.75rem;color:var(--text-tertiary);">Ask AI clinical questions</div>
+                    </div>
+                </MudButton>
+                <MudButton StartIcon="@Icons.Material.Filled.Assessment" Variant="Variant.Outlined"
+                           FullWidth="true" Style="justify-content:flex-start;text-transform:none;"
+                           OnClick="@(() => _selectedTool = "predict")">
+                    <div style="text-align:left;">
+                        <div style="font-weight:600;">Outcome Prediction</div>
+                        <div style="font-size:0.75rem;color:var(--text-tertiary);">Predict treatment outcomes</div>
+                    </div>
+                </MudButton>
+            </div>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" md="8">
+        <MudCard Class="content-card" Style="min-height:500px;">
+            <div class="card-header">
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Style="color:var(--accent-primary);" />
+                    <MudText Typo="Typo.h6" Style="font-weight:600;">@GetToolTitle()</MudText>
+                </div>
+            </div>
+            <div style="padding:1.5rem;">
+                @if (_selectedTool == "chat")
+                {
+                    <div style="display:flex;flex-direction:column;gap:1rem;">
+                        <div style="flex:1;min-height:300px;border:1px solid var(--border-color);border-radius:var(--radius-md);padding:1rem;overflow-y:auto;background:var(--bg-tertiary);">
+                            @if (_chatMessages.Any())
+                            {
+                                @foreach (var msg in _chatMessages)
+                                {
+                                    <div style="margin-bottom:1rem;display:flex;@(msg.IsUser ? "justify-content:flex-end;" : "justify-content:flex-start;")">
+                                        <div style="max-width:80%;padding:0.75rem 1rem;border-radius:var(--radius-md);@(msg.IsUser ? "background:var(--accent-primary);color:white;" : "background:var(--bg-card);border:1px solid var(--border-color);")">
+                                            <MudText Typo="Typo.body2" Style="@(msg.IsUser ? "color:white;" : "")">@msg.Message</MudText>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                else if (_selectedTool == "treatment")
+                {
+                    <MudGrid>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_treatmentPatientName" Label="Patient Name" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="string" @bind-Value="_treatmentType" Label="Treatment Type" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                <MudSelectItem Value="@("Traditional")">Traditional</MudSelectItem>
+                                <MudSelectItem Value="@("Ceramic")">Ceramic</MudSelectItem>
+                                <MudSelectItem Value="@("Invisalign")">Invisalign</MudSelectItem>
+                                <MudSelectItem Value="@("Lingual")">Lingual</MudSelectItem>
+                                <MudSelectItem Value="@("Damon")">Damon</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_treatmentDiagnosis" Label="Diagnosis / Description" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="3" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudButton Variant="Variant.Filled" Style="color:white;" OnClick="GenerateTreatmentPlan" Disabled="_treatmentLoading">
+                                @if (_treatmentLoading) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> } else { <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Small" Style="margin-right:0.5rem;" /> }
+                                Generate Treatment Plan
+                            </MudButton>
+                        </MudItem>
+                        @if (!string.IsNullOrEmpty(_treatmentResult))
+                        {
+                            <MudItem xs="12">
+                                <MudPaper Style="padding:1rem;background:var(--bg-tertiary);border-radius:var(--radius-md);white-space:pre-wrap;">
+                                    <MudText Typo="Typo.body2">@_treatmentResult</MudText>
+                                </MudPaper>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                }
+                else if (_selectedTool == "analysis")
+                {
+                    <MudGrid>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_analysisPatientProfile" Label="Patient Profile (diagnosis, age, treatment history...)" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="4" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudButton Variant="Variant.Filled" Style="color:white;" OnClick="GenerateAnalysis" Disabled="_analysisLoading">
+                                @if (_analysisLoading) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> } else { <MudIcon Icon="@Icons.Material.Filled.Psychology" Size="Size.Small" Style="margin-right:0.5rem;" /> }
+                                Analyze Patient
+                            </MudButton>
+                        </MudItem>
+                        @if (_analysisResults.Any())
+                        {
+                            <MudItem xs="12">
+                                <MudList T="string">
+                                    @foreach (var item in _analysisResults)
+                                    {
+                                        <MudListItem T="string" Text="@item" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Primary" />
+                                    }
+                                </MudList>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                }
+                else if (_selectedTool == "predict")
+                {
+                    <MudGrid>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_predictPatientProfile" Label="Patient Profile for Prediction" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="4" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudButton Variant="Variant.Filled" Style="color:white;" OnClick="GeneratePrediction" Disabled="_predictLoading">
+                                @if (_predictLoading) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> } else { <MudIcon Icon="@Icons.Material.Filled.Assessment" Size="Size.Small" Style="margin-right:0.5rem;" /> }
+                                Predict Outcome
+                            </MudButton>
+                        </MudItem>
+                        @if (!string.IsNullOrEmpty(_predictResult))
+                        {
+                            <MudItem xs="12">
+                                <MudPaper Style="padding:1rem;background:var(--bg-tertiary);border-radius:var(--radius-md);white-space:pre-wrap;">
+                                    <MudText Typo="Typo.body2">@_predictResult</MudText>
+                                </MudPaper>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                }
+                else
+                            {
+                                <div style="text-align:center;padding:3rem;">
+                                    <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Large" Style="color:var(--accent-primary);opacity:0.5;" />
+                                    <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);margin-top:0.5rem;">
+                                        Ask me anything about orthodontic treatment
+                                    </MudText>
+                                </div>
+                            }
+                        </div>
+                        <div style="display:flex;gap:0.5rem;">
+                            <MudTextField @bind-Value="_chatInput" Placeholder="Ask a question..."
+                                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                                          FullWidth="true"
+                                          OnKeyDown="OnChatKeyDown" />
+                            <MudButton Variant="Variant.Filled" OnClick="SendChatMessage" Disabled="_chatLoading"
+                                       Style="color:white;min-width:100px;">
+                                @if (_chatLoading) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> } else { <text>Send</text> }
+                            </MudButton>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div style="text-align:center;padding:4rem;">
+                        <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Large"
+                                 Style="color:var(--accent-primary);font-size:3rem;opacity:0.3;" />
+                        <MudText Typo="Typo.h6" Style="color:var(--text-secondary);margin-top:1rem;font-weight:600;">
+                            @GetToolTitle()
+                        </MudText>
+                        <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);margin-top:0.5rem;max-width:400px;margin-left:auto;margin-right:auto;">
+                            @GetToolDescription()
+                        </MudText>
+                        <MudButton Variant="Variant.Filled" Style="margin-top:1.5rem;color:white;"
+                                   StartIcon="@Icons.Material.Filled.PlayArrow">
+                            Get Started
+                        </MudButton>
+                    </div>
+                }
+            </div>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private string _selectedTool = "chat";
+    private string _chatInput = "";
+    private bool _chatLoading;
+    private List<ChatMessageItem> _chatMessages = new();
+
+    private string _treatmentPatientName = "";
+    private string _treatmentDiagnosis = "";
+    private string _treatmentType = "Traditional";
+    private bool _treatmentLoading;
+    private string _treatmentResult = "";
+
+    private string _analysisPatientProfile = "";
+    private bool _analysisLoading;
+    private List<string> _analysisResults = new();
+
+    private string _predictPatientProfile = "";
+    private bool _predictLoading;
+    private string _predictResult = "";
+
+    private string GetToolTitle() => _selectedTool switch
+    {
+        "treatment" => "Treatment Plan Generator",
+        "analysis" => "Patient Analysis",
+        "chat" => "Clinical Chat",
+        "predict" => "Outcome Prediction",
+        _ => "AI Assistant"
+    };
+
+    private string GetToolDescription() => _selectedTool switch
+    {
+        "treatment" => "Input patient parameters and get AI-generated treatment plan recommendations based on best practices.",
+        "analysis" => "Analyze patient data to identify risk factors and recommend preventive measures.",
+        "chat" => "Ask clinical questions and get evidence-based answers from our AI assistant.",
+        "predict" => "Predict treatment outcomes and estimated completion times based on historical data.",
+        _ => ""
+    };
+
+    private async Task SendChatMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_chatInput)) return;
+
+        _chatMessages.Add(new ChatMessageItem(_chatInput, true));
+        var userMessage = _chatInput;
+        _chatInput = "";
+        _chatLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await ApiService.PostAsync<ApiResponse<string>>("api/ai/chat", new { Message = userMessage });
+            if (result?.Success == true && !string.IsNullOrEmpty(result.Data))
+            {
+                _chatMessages.Add(new ChatMessageItem(result.Data, false));
+            }
+            else
+            {
+                _chatMessages.Add(new ChatMessageItem(
+                    "I'm sorry, I couldn't process your request. Please ensure the API server is running and the OpenAI API key is configured.", false));
+            }
+        }
+        catch (Exception)
+        {
+            _chatMessages.Add(new ChatMessageItem(
+                "An error occurred while connecting to the AI service. Please try again later.", false));
+        }
+        finally
+        {
+            _chatLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task GenerateTreatmentPlan()
+    {
+        if (string.IsNullOrWhiteSpace(_treatmentPatientName) || string.IsNullOrWhiteSpace(_treatmentDiagnosis))
+        {
+            Snackbar.Add("Patient name and diagnosis are required", Severity.Warning);
+            return;
+        }
+
+        _treatmentLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var request = new TreatmentReportRequest
+            {
+                PatientName = _treatmentPatientName,
+                Diagnosis = _treatmentDiagnosis,
+                TreatmentType = _treatmentType,
+                StartDate = DateTime.UtcNow
+            };
+            var result = await ApiService.PostAsync<ApiResponse<string>>("api/ai/generate-report", request);
+            _treatmentResult = result?.Success == true ? result.Data! : "Failed to generate treatment plan. Please check API configuration.";
+        }
+        catch
+        {
+            _treatmentResult = "Error connecting to AI service.";
+        }
+        finally
+        {
+            _treatmentLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task GenerateAnalysis()
+    {
+        if (string.IsNullOrWhiteSpace(_analysisPatientProfile))
+        {
+            Snackbar.Add("Patient profile is required", Severity.Warning);
+            return;
+        }
+
+        _analysisLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await ApiService.PostAsync<ApiResponse<List<string>>>(
+                "api/ai/generate-recommendations",
+                new { PatientProfile = _analysisPatientProfile });
+            _analysisResults = result?.Success == true ? result.Data! : new List<string> { "Failed to generate analysis." };
+        }
+        catch
+        {
+            _analysisResults = new List<string> { "Error connecting to AI service." };
+        }
+        finally
+        {
+            _analysisLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task GeneratePrediction()
+    {
+        if (string.IsNullOrWhiteSpace(_predictPatientProfile))
+        {
+            Snackbar.Add("Patient profile is required", Severity.Warning);
+            return;
+        }
+
+        _predictLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var request = new TreatmentReportRequest
+            {
+                PatientName = "Patient",
+                Diagnosis = _predictPatientProfile,
+                TreatmentType = "General",
+                StartDate = DateTime.UtcNow
+            };
+            var result = await ApiService.PostAsync<ApiResponse<string>>("api/ai/generate-report", request);
+            _predictResult = result?.Success == true ? result.Data! : "Failed to generate prediction.";
+        }
+        catch
+        {
+            _predictResult = "Error connecting to AI service.";
+        }
+        finally
+        {
+            _predictLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OnChatKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            _ = SendChatMessage();
+        }
+    }
+
+    record ChatMessageItem(string Message, bool IsUser);
+}

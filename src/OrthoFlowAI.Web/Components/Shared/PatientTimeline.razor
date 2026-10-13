@@ -1,0 +1,266 @@
+@using OrthoFlowAI.Web.Services
+@using OrthoFlowAI.Application.DTOs
+@using OrthoFlowAI.Web.Models
+@inject IDialogService DialogService
+
+<MudCard Class="content-card">
+    <MudCardContent>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:1rem;">
+            <div>
+                <MudText Typo="Typo.h6" Style="font-weight:600;">Treatment Timeline</MudText>
+                <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);">Complete history of visits and appointments</MudText>
+            </div>
+            <MudButton Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenVisitDialog">
+                Add Treatment Visit
+            </MudButton>
+        </div>
+
+        @if (_loading)
+        {
+            <LoadingSpinner Message="Loading timeline..." />
+        }
+        else if (_timelineItems.Count == 0)
+        {
+            <div style="text-align:center;padding:3rem;">
+                <MudIcon Icon="@Icons.Material.Filled.Timeline" Size="Size.Large" Style="color:var(--text-tertiary);opacity:0.5;" />
+                <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);margin-top:1rem;">No timeline entries yet</MudText>
+                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Add a treatment visit or appointment to start the timeline</MudText>
+            </div>
+        }
+        else
+        {
+            <div class="timeline-container">
+                @foreach (var item in _timelineItems)
+                {
+                    <div class="timeline-item" style="position:relative;padding-left:2.5rem;padding-bottom:2rem;border-left:2px solid var(--border-color);">
+                        <div style="position:absolute;left:-0.7rem;top:0.1rem;width:14px;height:14px;border-radius:50%;border:3px solid var(--bg-card);background:@GetItemColor(item.Type);box-shadow:0 0 0 2px @GetItemColor(item.Type);"></div>
+                        <div style="background:var(--bg-tertiary);border-radius:var(--radius-md);padding:1rem 1.25rem;">
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.5rem;flex-wrap:wrap;gap:0.5rem;">
+                                <div style="display:flex;align-items:center;gap:0.5rem;">
+                                    <MudChip T="string" Size="Size.Small" Style="@GetChipStyle(item.Type)" Class="mud-chip-clickable">@GetTypeLabel(item.Type)</MudChip>
+                                    <MudText Typo="Typo.subtitle1" Style="font-weight:700;">@item.Title</MudText>
+                                </div>
+                                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);white-space:nowrap;">@item.Date.ToString("MMM dd, yyyy HH:mm")</MudText>
+                            </div>
+
+                            @if (item is TreatmentVisitItem visit)
+                            {
+                                <div style="display:flex;flex-wrap:wrap;gap:0.75rem;margin-bottom:0.75rem;">
+                                    @if (visit.WireChanged)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">Wire Changed</MudChip>
+                                    }
+                                    @if (visit.BracketReplaced)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined">Bracket Replaced</MudChip>
+                                    }
+                                    @if (visit.RubberBandsUsed)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">Rubber Bands</MudChip>
+                                    }
+                                    @if (!string.IsNullOrEmpty(visit.PainLevel))
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">Pain: @visit.PainLevel</MudChip>
+                                    }
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(visit.DoctorNotes))
+                                {
+                                    <div style="margin-bottom:0.5rem;">
+                                        <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);font-weight:600;">Doctor Notes:</MudText>
+                                        <MudText Typo="Typo.body2" Style="color:var(--text-secondary);margin-top:0.25rem;line-height:1.6;">@visit.DoctorNotes</MudText>
+                                    </div>
+                                }
+
+                                @if (!string.IsNullOrEmpty(visit.Medication))
+                                {
+                                    <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);font-weight:600;">Medication:</MudText>
+                                    <MudText Typo="Typo.body2" Style="color:var(--text-secondary);margin-top:0.25rem;">@visit.Medication</MudText>
+                                }
+
+                                @if (visit.NextAppointmentDate.HasValue)
+                                {
+                                    <MudText Typo="Typo.caption" Style="color:var(--info);font-weight:600;margin-top:0.5rem;display:block;">
+                                        Next Appointment: @visit.NextAppointmentDate.Value.ToString("MMM dd, yyyy")
+                                    </MudText>
+                                }
+                            }
+                            else if (item is AppointmentItem appointment)
+                            {
+                                <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.5rem;">
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">@appointment.AppointmentType</MudChip>
+                                    <MudChip T="string" Size="Size.Small" Style="@GetApptStatusStyle(appointment.Status)" Class="mud-chip-clickable">@appointment.Status</MudChip>
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">@appointment.Duration min</MudChip>
+                                </div>
+                                @if (!string.IsNullOrEmpty(appointment.Notes))
+                                {
+                                    <MudText Typo="Typo.body2" Style="color:var(--text-secondary);line-height:1.6;">@appointment.Notes</MudText>
+                                }
+                            }
+
+                            <div style="display:flex;gap:0.5rem;margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border-light);">
+                                <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => ViewDetails(item))" Style="color:var(--text-secondary);">
+                                    View Details
+                                </MudButton>
+                                @if (item.Type == "visit")
+                                {
+                                    <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => EditVisit((TreatmentVisitItem)item))" Style="color:var(--accent-primary);">
+                                        Edit
+                                    </MudButton>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </MudCardContent>
+</MudCard>
+
+@code {
+    [Parameter] public string PatientId { get; set; } = "";
+    [Parameter] public IApiService ApiService { get; set; } = default!;
+    [Parameter] public ISnackbar Snackbar { get; set; } = default!;
+
+    private List<TimelineItem> _timelineItems = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTimeline();
+    }
+
+    private async Task LoadTimeline()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var visitResult = await ApiService.GetAsync<ApiResponse<List<TreatmentVisitResponse>>>($"api/treatment-visits?patientId={PatientId}");
+            if (visitResult?.Success == true && visitResult.Data != null)
+            {
+                foreach (var visit in visitResult.Data)
+                {
+                    _timelineItems.Add(new TreatmentVisitItem
+                    {
+                        Type = "visit",
+                        Date = visit.VisitDate,
+                        Title = $"Treatment Visit - {visit.VisitDate:MMM dd, yyyy}",
+                        WireChanged = visit.WireChanged,
+                        BracketReplaced = visit.BracketReplaced,
+                        RubberBandsUsed = visit.RubberBandsUsed,
+                        PainLevel = visit.PainLevel.ToString(),
+                        DoctorNotes = visit.DoctorNotes,
+                        Medication = visit.Medication,
+                        NextAppointmentDate = visit.NextAppointmentDate
+                    });
+                }
+            }
+
+            var apptResult = await ApiService.GetAsync<ApiResponse<PagedResult<AppointmentResponse>>>($"api/appointments?patientId={PatientId}&pageSize=100");
+            if (apptResult?.Success == true && apptResult.Data?.Items != null)
+            {
+                foreach (var appt in apptResult.Data.Items)
+                {
+                    _timelineItems.Add(new AppointmentItem
+                    {
+                        Type = "appointment",
+                        Date = appt.AppointmentDate,
+                        Title = $"{appt.Type} - {appt.AppointmentDate:MMM dd, yyyy HH:mm}",
+                        Status = appt.Status.ToString(),
+                        AppointmentType = appt.Type.ToString(),
+                        Duration = appt.Duration,
+                        Notes = appt.Notes
+                    });
+                }
+            }
+
+            _timelineItems = _timelineItems.OrderByDescending(x => x.Date).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load timeline: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenVisitDialog()
+    {
+        var parameters = new DialogParameters<TreatmentVisitDialog>
+        {
+            { x => x.PatientId, PatientId }
+        };
+        var dialog = await DialogService.ShowAsync<TreatmentVisitDialog>("Add Treatment Visit", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadTimeline();
+        }
+    }
+
+    private async Task EditVisit(TreatmentVisitItem visit)
+    {
+        var existingVisit = new TreatmentVisitResponse
+        {
+            Id = visit.Id ?? "",
+            VisitDate = visit.Date,
+            WireChanged = visit.WireChanged,
+            BracketReplaced = visit.BracketReplaced,
+            RubberBandsUsed = visit.RubberBandsUsed,
+            PainLevel = Enum.TryParse<PainLevel>(visit.PainLevel, out var pl) ? pl : PainLevel.None,
+            DoctorNotes = visit.DoctorNotes,
+            Medication = visit.Medication,
+            NextAppointmentDate = visit.NextAppointmentDate
+        };
+
+        var parameters = new DialogParameters<TreatmentVisitDialog>
+        {
+            { x => x.PatientId, PatientId },
+            { x => x.ExistingVisit, existingVisit }
+        };
+        var dialog = await DialogService.ShowAsync<TreatmentVisitDialog>("Edit Treatment Visit", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await LoadTimeline();
+        }
+    }
+
+    private void ViewDetails(TimelineItem item)
+    {
+        Snackbar.Add($"View details for: {item.Title}", Severity.Info);
+    }
+
+    private string GetItemColor(string type) => type switch
+    {
+        "visit" => "#6366f1",
+        "appointment" => "#06b6d4",
+        _ => "#6b7280"
+    };
+
+    private string GetTypeLabel(string type) => type switch
+    {
+        "visit" => "Visit",
+        "appointment" => "Appointment",
+        _ => type
+    };
+
+    private string GetChipStyle(string type) => type switch
+    {
+        "visit" => "background:var(--primary-light);color:var(--primary);font-weight:600;",
+        "appointment" => "background:var(--info-light);color:var(--info);font-weight:600;",
+        _ => "background:var(--bg-tertiary);"
+    };
+
+    private string GetApptStatusStyle(string s) => s switch
+    {
+        "Completed" => "background:var(--success-light);color:var(--success);font-weight:600;",
+        "Cancelled" or "NoShow" => "background:var(--danger-light);color:var(--danger);font-weight:600;",
+        _ => "background:var(--info-light);color:var(--info);font-weight:600;"
+    };
+}

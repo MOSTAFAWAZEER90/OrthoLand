@@ -1,0 +1,62 @@
+@typeparam T
+
+<MudCard Class="content-card" Style="overflow:hidden;">
+    @if (ShowToolbar)
+    {
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:0.75rem;">
+                @if (!string.IsNullOrEmpty(Title))
+                {
+                    <MudText Typo="Typo.h6" Style="font-weight:600;">@Title</MudText>
+                }
+                @HeaderContent
+            </div>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                @ToolbarContent
+            </div>
+        </div>
+    }
+    <MudTable T="T"
+              Items="@Items"
+              Hover="@Hover"
+              Striped="@Striped"
+              Dense="@Dense"
+              Loading="@Loading"
+              LoadingProgressColor="Color.Primary"
+              FixedHeader="@FixedHeader"
+              Height="@Height"
+              OnRowClick="@OnRowClick">
+        <HeaderContent>
+            @Header
+        </HeaderContent>
+        <RowTemplate>
+            @Row(context)
+        </RowTemplate>
+        <PagerContent>
+            @if (ShowPager)
+            {
+                <MudTablePager PageSizeOptions="@PageSizeOptions"
+                               HorizontalAlignment="HorizontalAlignment.End" />
+            }
+        </PagerContent>
+    </MudTable>
+</MudCard>
+
+@code {
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public bool ShowToolbar { get; set; } = true;
+    [Parameter] public RenderFragment? HeaderContent { get; set; }
+    [Parameter] public RenderFragment? ToolbarContent { get; set; }
+    [Parameter] public RenderFragment Header { get; set; } = null!;
+    [Parameter] public RenderFragment<T> Row { get; set; } = null!;
+    [Parameter] public IEnumerable<T> Items { get; set; } = Enumerable.Empty<T>();
+    [Parameter] public bool Hover { get; set; } = true;
+    [Parameter] public bool Striped { get; set; }
+    [Parameter] public bool Dense { get; set; }
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public bool FixedHeader { get; set; } = true;
+    [Parameter] public string Height { get; set; } = "calc(100vh - 320px)";
+    [Parameter] public bool ShowPager { get; set; } = true;
+    [Parameter] public int[] PageSizeOptions { get; set; } = new[] { 10, 25, 50, 100 };
+    [Parameter] public EventCallback<TableRowClickEventArgs<T>> OnRowClick { get; set; }
+}

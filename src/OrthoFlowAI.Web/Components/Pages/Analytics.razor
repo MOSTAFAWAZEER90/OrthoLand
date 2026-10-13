@@ -1,0 +1,156 @@
+@page "/analytics"
+@rendermode InteractiveServer
+@using OrthoFlowAI.Infrastructure.Services
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+
+<PageTitle>Analytics - OrthoFlowAI</PageTitle>
+
+<div class="page-header">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Analytics</MudText>
+        <MudText Typo="Typo.body2" Style="color:var(--text-secondary);margin-top:0.25rem;">
+            Business and clinical performance insights
+        </MudText>
+    </div>
+</div>
+
+@if (_loading)
+{
+    <LoadingSpinner Message="Crunching the numbers..." />
+}
+else
+{
+    <div class="dash-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-bottom:1.5rem;">
+        <div class="stat-card">
+            <div style="width:42px;height:42px;border-radius:10px;background:var(--accent-gradient);display:flex;align-items:center;justify-content:center;">
+                <MudIcon Icon="@Icons.Material.Filled.Groups" Size="Size.Small" Style="color:white;" />
+            </div>
+            <div class="stat-info">
+                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Patients</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight:800;">@_stats.TotalPatients</MudText>
+                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">@_stats.NewPatientsThisMonth new this month</MudText>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div style="width:42px;height:42px;border-radius:10px;background:var(--info-light);display:flex;align-items:center;justify-content:center;">
+                <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Size="Size.Small" Style="color:var(--info);" />
+            </div>
+            <div class="stat-info">
+                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Appointments</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight:800;">@_stats.MonthAppointments</MudText>
+                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">@_stats.TodayAppointments today</MudText>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div style="width:42px;height:42px;border-radius:10px;background:var(--success-light);display:flex;align-items:center;justify-content:center;">
+                <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Small" Style="color:var(--success);" />
+            </div>
+            <div class="stat-info">
+                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Revenue (month)</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight:800;">@_stats.MonthRevenue.ToString("C0")</MudText>
+                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">@_stats.PendingPayments.ToString("C0") pending</MudText>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div style="width:42px;height:42px;border-radius:10px;background:var(--warning-light);display:flex;align-items:center;justify-content:center;">
+                <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Small" Style="color:var(--warning);" />
+            </div>
+            <div class="stat-info">
+                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Inventory</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight:800;">@_stats.TotalInvoices invoices</MudText>
+                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">@_stats.OverdueInvoices overdue</MudText>
+            </div>
+        </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem;">
+        <MudCard Class="content-card">
+            <MudCardContent>
+                <MudText Typo="Typo.h6" Style="font-weight:700;margin-bottom:1rem;">Revenue Trend</MudText>
+                <RevenueChartComponent Data="RevenueData" Height="280px" />
+            </MudCardContent>
+        </MudCard>
+        <MudCard Class="content-card">
+            <MudCardContent>
+                <MudText Typo="Typo.h6" Style="font-weight:700;margin-bottom:1rem;">Appointments</MudText>
+                <RevenueChartComponent Data="AppointmentData" Height="280px" />
+            </MudCardContent>
+        </MudCard>
+    </div>
+
+    <MudCard Class="content-card">
+        <MudCardContent>
+            <MudText Typo="Typo.h6" Style="font-weight:700;margin-bottom:1rem;">Top Doctors</MudText>
+            @if (_topDoctors.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);">No data yet.</MudText>
+            }
+            else
+            {
+                <MudSimpleTable Dense="true" Hover="true">
+                    <thead>
+                        <tr>
+                            <th>Doctor</th>
+                            <th>Appointments</th>
+                            <th>Revenue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var d in _topDoctors)
+                        {
+                            <tr>
+                                <td><MudText Typo="Typo.body2" Style="font-weight:600;">@d.DoctorName</MudText></td>
+                                <td>@d.AppointmentCount</td>
+                                <td>@d.Revenue.ToString("C0")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            }
+        </MudCardContent>
+    </MudCard>
+}
+
+@code {
+    private DashboardStats _stats = new();
+    private List<ChartPoint> RevenueData = new();
+    private List<ChartPoint> AppointmentData = new();
+    private List<TopDoctor> _topDoctors = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAnalytics();
+    }
+
+    private async Task LoadAnalytics()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var statsTask = ApiService.GetAsync<DashboardStats>("api/dashboard");
+            var revTask = ApiService.GetAsync<RevenueChart>("api/dashboard/revenue-chart?months=12");
+            var appTask = ApiService.GetAsync<AppointmentChart>("api/dashboard/appointment-chart?months=12");
+            var docsTask = ApiService.GetAsync<List<TopDoctor>>("api/dashboard/top-doctors?count=5");
+
+            await Task.WhenAll(statsTask, revTask, appTask, docsTask);
+
+            _stats = statsTask.Result ?? new();
+            RevenueData = revTask.Result?.DataPoints ?? new();
+            AppointmentData = appTask.Result?.DataPoints ?? new();
+            _topDoctors = docsTask.Result ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load analytics: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+}

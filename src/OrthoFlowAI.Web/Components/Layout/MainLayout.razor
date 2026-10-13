@@ -1,0 +1,108 @@
+@inherits LayoutComponentBase
+@inject IJSRuntime JS
+@inject AuthStateProvider AuthStateProvider
+@attribute [Authorize]
+
+<MudThemeProvider Theme="_theme" @bind-IsDarkMode="_isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider MaxWidth="MaxWidth.Medium"
+                   CloseButton="true" />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="0" Fixed="true" Class="mud-appbar"
+               Style="background:var(--bg-secondary);border-bottom:1px solid var(--border-color);height:var(--topbar-height);padding-left:calc(var(--sidebar-width) + 1rem);">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Size="Size.Medium"
+                       OnClick="ToggleSidebar"
+                       Style="color:var(--text-primary);margin-right:0.5rem;" />
+
+        <TopBar IsDarkMode="_isDarkMode" OnToggleDarkMode="ToggleDarkMode" />
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_sidebarOpen" Variant="DrawerVariant.Responsive"
+               ClipMode="DrawerClipMode.Always" Elevation="0"
+               Style="background:var(--bg-sidebar);width:var(--sidebar-width);transition:width var(--transition-base);border-right:1px solid rgba(255,255,255,0.06);">
+        <SidebarNav IsCollapsed="!_sidebarOpen" />
+    </MudDrawer>
+
+    <MudMainContent Style="margin-top:var(--topbar-height);padding:1.5rem;min-height:calc(100vh - var(--topbar-height));background:var(--bg-primary);overflow-y:auto;">
+        <div class="fade-in">
+            @Body
+        </div>
+    </MudMainContent>
+</MudLayout>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">X</span>
+</div>
+
+@code {
+    private bool _sidebarOpen = true;
+    private bool _isDarkMode = false;
+
+    private MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight()
+        {
+            Primary = "#6366f1",
+            Secondary = "#8b5cf6",
+            Success = "#10b981",
+            Info = "#3b82f6",
+            Warning = "#f59e0b",
+            Error = "#ef4444",
+            Background = "#fafafa",
+            Surface = "#ffffff",
+            AppbarBackground = "#ffffff",
+            DrawerBackground = "#1a1a2e",
+            TextPrimary = "#111827",
+            TextSecondary = "#6b7280",
+            Divider = "#e5e7eb"
+        },
+        PaletteDark = new PaletteDark()
+        {
+            Primary = "#818cf8",
+            Secondary = "#a78bfa",
+            Success = "#34d399",
+            Info = "#60a5fa",
+            Warning = "#fbbf24",
+            Error = "#f87171",
+            Background = "#0f0f1a",
+            Surface = "#1a1a2e",
+            AppbarBackground = "#1a1a2e",
+            DrawerBackground = "#0a0a16",
+            TextPrimary = "#f1f5f9",
+            TextSecondary = "#94a3b8",
+            Divider = "rgba(255,255,255,0.08)"
+        },
+        Typography = new Typography()
+        {
+            Default = new DefaultTypography()
+            {
+                FontFamily = new[] { "Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif" }
+            }
+        }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var theme = await JS.InvokeAsync<string?>("getStoredTheme");
+            _isDarkMode = theme == "dark";
+        }
+        catch { }
+    }
+
+    private void ToggleSidebar()
+    {
+        _sidebarOpen = !_sidebarOpen;
+    }
+
+    private async Task ToggleDarkMode()
+    {
+        _isDarkMode = !_isDarkMode;
+        await JS.InvokeVoidAsync("toggleDarkMode");
+    }
+}

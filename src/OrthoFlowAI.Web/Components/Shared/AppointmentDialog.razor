@@ -1,0 +1,140 @@
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+            <MudIcon Icon="@(IsEdit ? Icons.Material.Filled.Edit : Icons.Material.Filled.Event)" Color="Color.Primary" Size="Size.Medium" />
+            <MudText Typo="Typo.h6" Style="font-weight:600;">@(IsEdit ? "Edit Appointment" : "New Appointment")</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="Model.PatientId" Label="Patient ID" Required="true"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="Model.DoctorId" Label="Doctor ID" Required="true"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudDatePicker @bind-Date="_appointmentDate" Label="Appointment Date" Required="true"
+                               Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTimePicker @bind-Time="_appointmentTime" Label="Time" Required="true"
+                               Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="AppointmentType" @bind-Value="Model.Type" Label="Type" Required="true"
+                           Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem T="AppointmentType" Value="AppointmentType.Consultation">Consultation</MudSelectItem>
+                    <MudSelectItem T="AppointmentType" Value="AppointmentType.Adjustment">Adjustment</MudSelectItem>
+                    <MudSelectItem T="AppointmentType" Value="AppointmentType.FollowUp">Follow Up</MudSelectItem>
+                    <MudSelectItem T="AppointmentType" Value="AppointmentType.Emergency">Emergency</MudSelectItem>
+                    <MudSelectItem T="AppointmentType" Value="AppointmentType.Cleaning">Cleaning</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudNumericField @bind-Value="Model.Duration" Label="Duration (minutes)" Min="5" Max="480"
+                                 Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="Model.Notes" Label="Notes" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined" Style="margin-right:0.5rem;">Cancel</MudButton>
+        <MudButton OnClick="Submit" Color="Color.Primary" Variant="Variant.Filled" Style="color:white;" Disabled="_saving">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            }
+            else
+            {
+                @(IsEdit ? "Update" : "Create")
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public CreateAppointmentRequest Model { get; set; } = new() { Duration = 30, Type = AppointmentType.Adjustment };
+    [Parameter] public bool IsEdit { get; set; }
+    [Parameter] public string? AppointmentId { get; set; }
+
+    private bool _saving;
+    private DateTime? _appointmentDate = DateTime.Today;
+    private TimeSpan? _appointmentTime = new(9, 0, 0);
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(Model.PatientId) || string.IsNullOrWhiteSpace(Model.DoctorId))
+        {
+            Snackbar.Add("Patient ID and Doctor ID are required", Severity.Warning);
+            return;
+        }
+
+        if (!_appointmentDate.HasValue || !_appointmentTime.HasValue)
+        {
+            Snackbar.Add("Date and time are required", Severity.Warning);
+            return;
+        }
+
+        Model.AppointmentDate = _appointmentDate.Value.Date.Add(_appointmentTime.Value);
+
+        _saving = true;
+        StateHasChanged();
+
+        try
+        {
+            if (IsEdit && !string.IsNullOrEmpty(AppointmentId))
+            {
+                var updateModel = new UpdateAppointmentRequest
+                {
+                    AppointmentDate = Model.AppointmentDate,
+                    Type = Model.Type,
+                    Duration = Model.Duration,
+                    Notes = Model.Notes
+                };
+                var result = await ApiService.PutAsync<object>($"api/appointments/{AppointmentId}", updateModel);
+                if (result != null)
+                {
+                    Snackbar.Add("Appointment updated successfully", Severity.Success);
+                    MudDialog.Close(DialogResult.Ok(true));
+                }
+                else
+                {
+                    Snackbar.Add("Failed to update appointment", Severity.Error);
+                }
+            }
+            else
+            {
+                var result = await ApiService.PostAsync<object>("api/appointments", Model);
+                if (result != null)
+                {
+                    Snackbar.Add("Appointment created successfully", Severity.Success);
+                    MudDialog.Close(DialogResult.Ok(true));
+                }
+                else
+                {
+                    Snackbar.Add("Failed to create appointment", Severity.Error);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+            StateHasChanged();
+        }
+    }
+}

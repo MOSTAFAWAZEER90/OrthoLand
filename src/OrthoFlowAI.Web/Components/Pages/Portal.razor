@@ -1,0 +1,510 @@
+@page "/portal"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IApiService ApiService
+@inject IAuthService AuthService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>My Portal - OrthoFlowAI</PageTitle>
+
+@if (_loading)
+{
+    <LoadingSpinner Message="Loading your treatment portal..." />
+}
+else if (_summary == null)
+{
+    <div style="text-align:center;padding:3rem;">
+        <MudIcon Icon="@Icons.Material.Filled.PersonOff" Size="Size.Large" Style="color:var(--text-tertiary);" />
+        <MudText Typo="Typo.h6" Style="color:var(--text-secondary);margin-top:1rem;">No patient profile linked to your account.</MudText>
+        <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);margin-top:0.5rem;">
+            Please contact your clinic to link your account to a patient record.
+        </MudText>
+    </div>
+}
+else
+{
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+        <div style="display:flex;align-items:center;gap:1rem;">
+            <MudAvatar Style="width:56px;height:56px;font-size:1.4rem;background:var(--accent-gradient);color:white;font-weight:700;">
+                @($"{_summary.FirstName[0]}{_summary.LastName[0]}")
+            </MudAvatar>
+            <div>
+                <MudText Typo="Typo.h4" Style="font-weight:800;">@($"{_summary.FirstName} {_summary.LastName}")</MudText>
+                <MudText Typo="Typo.body2" Style="color:var(--text-secondary);">My Treatment Portal</MudText>
+            </div>
+        </div>
+        <MudButton Variant="Variant.Filled" Style="background:var(--danger);color:white;"
+                   StartIcon="@Icons.Material.Filled.EmergencyShare" OnClick="OpenEmergencyDialog">
+            Emergency
+        </MudButton>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:1.5rem;">
+        <MudCard Class="content-card">
+            <MudCardContent>
+                <MudText Typo="Typo.body2" Style="font-weight:700;color:var(--accent-primary);font-size:1.5rem;">@_summary.Stats.TotalAppointments</MudText>
+                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Total Appointments</MudText>
+            </MudCardContent>
+        </MudCard>
+        <MudCard Class="content-card">
+            <MudCardContent>
+                <MudText Typo="Typo.body2" Style="font-weight:700;color:var(--info);font-size:1.5rem;">@_summary.Stats.UpcomingAppointments</MudText>
+                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Upcoming</MudText>
+            </MudCardContent>
+        </MudCard>
+        <MudCard Class="content-card">
+            <MudCardContent>
+                <MudText Typo="Typo.body2" Style="font-weight:700;color:var(--success);font-size:1.5rem;">@_summary.JourneyScore.ToString("F0")%</MudText>
+                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Journey Progress</MudText>
+            </MudCardContent>
+        </MudCard>
+        <MudCard Class="content-card">
+            <MudCardContent>
+                <MudText Typo="Typo.body2" Style="font-weight:700;color:var(--warning);font-size:1.5rem;">$@_summary.Stats.OutstandingBalance.ToString("N0")</MudText>
+                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Outstanding Balance</MudText>
+            </MudCardContent>
+        </MudCard>
+    </div>
+
+    <MudTabs @bind-ActivePanelIndex="_activeTab" Elevation="0"
+             Style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-lg);">
+        <MudTabPanel Text="Overview" Icon="@Icons.Material.Filled.Dashboard">
+            <div style="padding:1.5rem;">
+                <MudGrid>
+                    @if (!string.IsNullOrEmpty(_summary.Diagnosis))
+                    {
+                        <MudItem xs="12" md="6">
+                            <MudCard Style="background:var(--bg-tertiary);border:none;">
+                                <MudCardContent>
+                                    <MudText Typo="Typo.h6" Style="font-weight:600;margin-bottom:0.5rem;">Diagnosis</MudText>
+                                    <MudText Typo="Typo.body2" Style="color:var(--text-secondary);line-height:1.8;">@_summary.Diagnosis</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                    }
+                    @if (!string.IsNullOrEmpty(_summary.TreatmentPlanDescription))
+                    {
+                        <MudItem xs="12" md="6">
+                            <MudCard Style="background:var(--bg-tertiary);border:none;">
+                                <MudCardContent>
+                                    <MudText Typo="Typo.h6" Style="font-weight:600;margin-bottom:0.5rem;">Treatment Plan</MudText>
+                                    <MudText Typo="Typo.body2" Style="color:var(--text-secondary);line-height:1.8;">@_summary.TreatmentPlanDescription</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem;">
+                    <div>
+                        <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Treatment Type</MudText>
+                        <MudText Typo="Typo.body2" Style="font-weight:600;">@(_summary.TreatmentType?.ToString() ?? "Not assigned")</MudText>
+                    </div>
+                    <div>
+                        <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Doctor</MudText>
+                        <MudText Typo="Typo.body2" Style="font-weight:600;">@(_summary.AssignedDoctorName ?? "Unassigned")</MudText>
+                    </div>
+                    <div>
+                        <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Branch</MudText>
+                        <MudText Typo="Typo.body2" Style="font-weight:600;">@(_summary.BranchName ?? "—")</MudText>
+                    </div>
+                    <div>
+                        <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Treatment Start</MudText>
+                        <MudText Typo="Typo.body2" Style="font-weight:600;">@(_summary.TreatmentStartDate?.ToString("MMM dd, yyyy") ?? "—")</MudText>
+                    </div>
+                </div>
+            </div>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Appointments" Icon="@Icons.Material.Filled.CalendarMonth">
+            <div style="padding:1.5rem;">
+                <MudText Typo="Typo.h6" Style="font-weight:600;margin-bottom:1rem;">My Appointments</MudText>
+                @if (_appointments == null)
+                {
+                    <LoadingSpinner Message="Loading appointments..." />
+                }
+                else if (_appointments.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);">No appointments available.</MudText>
+                }
+                else
+                {
+                    <MudSimpleTable Dense="true" Style="background:var(--bg-tertiary);border:none;">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Duration</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var a in _appointments)
+                            {
+                                <tr>
+                                    <td>@a.AppointmentDate.ToString("MMM dd, yyyy hh:mm tt")</td>
+                                    <td>@a.Type</td>
+                                    <td><MudChip T="string" Style="@GetApptStatusStyle(a.Status)">@a.Status</MudChip></td>
+                                    <td>@a.Duration min</td>
+                                    <td>@(a.Notes ?? "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </div>
+        </MudTabPanel>
+
+        <MudTabPanel Text="My Photos" Icon="@Icons.Material.Filled.PhotoLibrary">
+            <div style="padding:1.5rem;">
+                <MudText Typo="Typo.h6" Style="font-weight:600;margin-bottom:1rem;">My Treatment Photos</MudText>
+                @if (_photos == null)
+                {
+                    <LoadingSpinner Message="Loading photos..." />
+                }
+                else if (_photos.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);">No photos available.</MudText>
+                }
+                else
+                {
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1rem;">
+                        @foreach (var photo in _photos)
+                        {
+                            <MudCard Class="content-card" Style="overflow:hidden;">
+                                <div style="aspect-ratio:1/1;overflow:hidden;">
+                                    <img src="@ApiService.GetFullUrl(photo.Url)" alt="@photo.FileName"
+                                         style="width:100%;height:100%;object-fit:cover;display:block;" />
+                                </div>
+                                <MudCardContent Style="padding:0.6rem;">
+                                    <MudText Typo="Typo.caption" Style="font-weight:600;">@photo.Category</MudText>
+                                    @if (photo.VisitDate.HasValue)
+                                    {
+                                        <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">@photo.VisitDate.Value.ToString("MMM dd, yyyy")</MudText>
+                                    }
+                                </MudCardContent>
+                            </MudCard>
+                        }
+                    </div>
+                }
+            </div>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Invoices" Icon="@Icons.Material.Filled.Receipt">
+            <div style="padding:1.5rem;">
+                <MudText Typo="Typo.h6" Style="font-weight:600;margin-bottom:1rem;">My Invoices</MudText>
+                @if (_invoices == null)
+                {
+                    <LoadingSpinner Message="Loading invoices..." />
+                }
+                else if (_invoices.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);">No invoices available.</MudText>
+                }
+                else
+                {
+                    <MudSimpleTable Dense="true" Style="background:var(--bg-tertiary);border:none;">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Total</th>
+                                <th>Paid</th>
+                                <th>Balance</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var inv in _invoices)
+                            {
+                                <tr>
+                                    <td>@inv.CreatedAt.ToString("MMM dd, yyyy")</td>
+                                    <td>$@inv.TotalAmount.ToString("N0")</td>
+                                    <td style="color:var(--success);">$@inv.PaidAmount.ToString("N0")</td>
+                                    <td style="color:var(--danger);font-weight:600;">$@inv.Balance.ToString("N0")</td>
+                                    <td><MudChip T="string" Style="@GetPayStyle(inv.PaymentStatus)">@inv.PaymentStatus</MudChip></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </div>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Pain Tracker" Icon="@Icons.Material.Filled.MonitorHeart">
+            <div style="padding:1.5rem;">
+                <MudText Typo="Typo.h6" Style="font-weight:600;margin-bottom:0.5rem;">Pain &amp; Symptoms Tracker</MudText>
+                <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);margin-bottom:1rem;">
+                    Report how you're feeling after your last adjustment. Your clinical team is notified for severe pain.
+                </MudText>
+
+                <MudPaper Style="padding:1.25rem;background:var(--bg-tertiary);border:none;margin-bottom:1.5rem;">
+                    <MudText Typo="Typo.subtitle1" Style="font-weight:600;margin-bottom:0.75rem;">Submit Report</MudText>
+                    <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);margin-bottom:0.25rem;">Pain Level: @_painLevel</MudText>
+                    <MudSlider @bind-Value="_painLevel" Min="0" Max="10" Color="Color.Primary" />
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;margin:1rem 0;">
+                        <MudCheckBox T="bool" @bind-Value="_brokenWire" Label="Broken wire" />
+                        <MudCheckBox T="bool" @bind-Value="_looseBracket" Label="Loose bracket" />
+                        <MudCheckBox T="bool" @bind-Value="_bleeding" Label="Bleeding" />
+                        <MudCheckBox T="bool" @bind-Value="_swelling" Label="Swelling" />
+                    </div>
+                    <MudTextField @bind-Value="_painDescription" Label="Description (optional)" Variant="Variant.Outlined" FullWidth="true" Margin="Margin.Dense" />
+                    <MudButton Variant="Variant.Filled" Style="color:white;margin-top:0.75rem;" Disabled="_submittingPain" OnClick="SubmitPainReport">
+                        @if (_submittingPain) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> } else { @("Submit Report") }
+                    </MudButton>
+                </MudPaper>
+
+                @if (_painReports != null && _painReports.Count > 0)
+                {
+                    <MudText Typo="Typo.subtitle1" Style="font-weight:600;margin-bottom:0.75rem;">History</MudText>
+                    <MudSimpleTable Dense="true" Style="background:var(--bg-tertiary);border:none;">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Pain Level</th>
+                                <th>Symptoms</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var r in _painReports)
+                            {
+                                <tr>
+                                    <td>@r.ReportDate.ToString("MMM dd, yyyy hh:mm tt")</td>
+                                    <td>@r.PainLevel</td>
+                                    <td>
+                                        @{
+                                            var symptoms = new List<string>();
+                                            if (r.HasBrokenWire) symptoms.Add("Broken wire");
+                                            if (r.HasLooseBracket) symptoms.Add("Loose bracket");
+                                            if (r.HasBleeding) symptoms.Add("Bleeding");
+                                            if (r.HasSwelling) symptoms.Add("Swelling");
+                                            @string.Join(", ", symptoms.Count > 0 ? symptoms : new List<string> { "—" });
+                                        }
+                                    </td>
+                                    <td>@(r.DoctorNotified ? "Notified" : "Logged")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </div>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Messages" Icon="@Icons.Material.Filled.Chat">
+            <div style="padding:1.5rem;">
+                <MudText Typo="Typo.h6" Style="font-weight:600;margin-bottom:1rem;">Messages</MudText>
+                <div style="max-height:360px;overflow-y:auto;background:var(--bg-tertiary);border-radius:var(--radius-md);padding:1rem;margin-bottom:1rem;">
+                    @if (_messages != null && _messages.Count > 0)
+                    {
+                        @foreach (var m in _messages)
+                        {
+                            var mine = m.SenderId == _myUserId;
+                            <div style="display:flex;justify-content:@(mine ? "flex-end" : "flex-start");margin-bottom:0.5rem;">
+                                <div style="max-width:75%;padding:0.6rem 0.9rem;border-radius:var(--radius-md);background:@(mine ? "var(--accent-primary)" : "var(--bg-card)");color:@(mine ? "white" : "var(--text-primary)");">
+                                    <MudText Typo="Typo.body2">@m.Message</MudText>
+                                    <MudText Typo="Typo.caption" Style="opacity:0.7;display:block;margin-top:0.15rem;">@m.CreatedAt.ToString("MMM dd, hh:mm tt")</MudText>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);text-align:center;padding:1rem;">No messages yet.</MudText>
+                    }
+                </div>
+                <div style="display:flex;gap:0.5rem;">
+                    <MudTextField @bind-Value="_newMessage" Placeholder="Type a message to your clinic..." Variant="Variant.Outlined" Margin="Margin.Dense" FullWidth="true" />
+                    <MudButton Variant="Variant.Filled" Style="color:white;" Disabled="_sendingMessage" OnClick="SendMessage">Send</MudButton>
+                </div>
+            </div>
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@code {
+    private PatientPortalSummaryResponse? _summary;
+    private List<PortalAppointmentResponse>? _appointments;
+    private List<PhotoResponse>? _photos;
+    private List<PortalInvoiceResponse>? _invoices;
+    private List<PortalPainReportResponse>? _painReports;
+    private List<PortalChatResponse>? _messages;
+    private string _myUserId = "";
+
+    private bool _loading = true;
+    private int _activeTab = 0;
+
+    private int _painLevel = 0;
+    private bool _brokenWire, _looseBracket, _bleeding, _swelling;
+    private string _painDescription = "";
+    private bool _submittingPain;
+
+    private string _newMessage = "";
+    private bool _sendingMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPortal();
+    }
+
+    private async Task LoadPortal()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var me = await ApiService.GetAsync<ApiResponse<PatientPortalSummaryResponse>>("api/portal/me");
+            if (me?.Success == true && me.Data != null)
+            {
+                _summary = me.Data;
+                var currentUser = await AuthService.GetCurrentUserAsync();
+                _myUserId = currentUser?.Id ?? "";
+            }
+
+            if (_summary != null)
+            {
+                await Task.WhenAll(
+                    LoadAppointments(),
+                    LoadPhotos(),
+                    LoadInvoices(),
+                    LoadPainReports(),
+                    LoadMessages()
+                );
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading portal: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadAppointments()
+    {
+        var r = await ApiService.GetAsync<ApiResponse<List<PortalAppointmentResponse>>>("api/portal/appointments");
+        _appointments = r?.Data ?? new();
+    }
+
+    private async Task LoadPhotos()
+    {
+        var r = await ApiService.GetAsync<ApiResponse<List<PhotoResponse>>>("api/portal/photos");
+        _photos = r?.Data ?? new();
+    }
+
+    private async Task LoadInvoices()
+    {
+        var r = await ApiService.GetAsync<ApiResponse<List<PortalInvoiceResponse>>>("api/portal/invoices");
+        _invoices = r?.Data ?? new();
+    }
+
+    private async Task LoadPainReports()
+    {
+        var r = await ApiService.GetAsync<ApiResponse<List<PortalPainReportResponse>>>("api/portal/pain-reports");
+        _painReports = r?.Data ?? new();
+    }
+
+    private async Task LoadMessages()
+    {
+        var r = await ApiService.GetAsync<ApiResponse<List<PortalChatResponse>>>("api/portal/messages");
+        _messages = r?.Data ?? new();
+    }
+
+    private async Task SubmitPainReport()
+    {
+        _submittingPain = true;
+        StateHasChanged();
+
+        try
+        {
+            var request = new PortalPainReportRequest
+            {
+                PainLevel = (PainLevel)_painLevel,
+                HasBrokenWire = _brokenWire,
+                HasLooseBracket = _looseBracket,
+                HasBleeding = _bleeding,
+                HasSwelling = _swelling,
+                Description = _painDescription
+            };
+            var r = await ApiService.PostAsync<ApiResponse<PortalPainReportResponse>>("api/portal/pain-reports", request);
+            if (r?.Success == true)
+            {
+                Snackbar.Add("Pain report submitted", Severity.Success);
+                _painLevel = 0; _brokenWire = _looseBracket = _bleeding = _swelling = false;
+                _painDescription = "";
+                await LoadPainReports();
+            }
+            else
+            {
+                Snackbar.Add("Failed to submit report", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _submittingPain = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_newMessage)) return;
+        _sendingMessage = true;
+        StateHasChanged();
+
+        try
+        {
+            var r = await ApiService.PostAsync<ApiResponse<PortalChatResponse>>("api/portal/messages", new PortalMessageRequest { Message = _newMessage });
+            if (r?.Success == true)
+            {
+                _newMessage = "";
+                await LoadMessages();
+            }
+            else
+            {
+                Snackbar.Add(r?.Message ?? "Failed to send message", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _sendingMessage = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenEmergencyDialog()
+    {
+        var dialog = await DialogService.ShowAsync<EmergencyDialog>("Emergency Request");
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            Snackbar.Add("Emergency request submitted. Help is on the way.", Severity.Success);
+        }
+    }
+
+    private string GetApptStatusStyle(AppointmentStatus s) => s switch
+    {
+        AppointmentStatus.Completed => "background:var(--success-light);color:var(--success);font-weight:600;",
+        AppointmentStatus.Cancelled or AppointmentStatus.NoShow => "background:var(--danger-light);color:var(--danger);font-weight:600;",
+        _ => "background:var(--info-light);color:var(--info);font-weight:600;"
+    };
+
+    private string GetPayStyle(PaymentStatus s) => s switch
+    {
+        PaymentStatus.Paid => "background:var(--success-light);color:var(--success);font-weight:600;",
+        PaymentStatus.Overdue or PaymentStatus.Pending => "background:var(--danger-light);color:var(--danger);font-weight:600;",
+        _ => "background:var(--warning-light);color:var(--warning);font-weight:600;"
+    };
+}

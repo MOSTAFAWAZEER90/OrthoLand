@@ -1,0 +1,104 @@
+@namespace OrthoFlowAI.Web.Components.Shared
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+            <MudIcon Icon="@Icons.Material.Filled.Inventory2" Color="Color.Primary" Size="Size.Medium" />
+            <MudText Typo="Typo.h6" Style="font-weight:600;">@(IsEdit ? "Edit Item" : "Add Inventory Item")</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="Model.Name" Label="Name" Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudSelect T="InventoryCategory" @bind-Value="Model.Category" Label="Category" Variant="Variant.Outlined" Margin="Margin.Dense">
+            @foreach (var cat in Enum.GetValues<InventoryCategory>())
+            {
+                <MudSelectItem T="InventoryCategory" Value="cat">@cat</MudSelectItem>
+            }
+        </MudSelect>
+        <MudTextField @bind-Value="Model.Brand" Label="Brand" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField @bind-Value="Model.Model" Label="Model" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;">
+            <MudNumericField @bind-Value="Model.Quantity" Label="Quantity" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
+            <MudNumericField @bind-Value="Model.MinQuantity" Label="Min Qty" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
+            <MudNumericField @bind-Value="Model.UnitPrice" Label="Price" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
+        </div>
+        <MudTextField @bind-Value="Model.SupplierName" Label="Supplier" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField @bind-Value="Model.SupplierPhone" Label="Supplier Phone" Variant="Variant.Outlined" Margin="Margin.Dense" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined" Style="margin-right:0.5rem;">Cancel</MudButton>
+        <MudButton OnClick="Submit" Color="Color.Primary" Variant="Variant.Filled" Style="color:white;" Disabled="_saving">
+            @if (_saving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> } else { @(IsEdit ? "Update" : "Add") }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public bool IsEdit { get; set; }
+    [Parameter] public InventoryItem? Item { get; set; }
+
+    private InventoryDto Model { get; set; } = new();
+    private bool _saving;
+
+    protected override void OnInitialized()
+    {
+        if (IsEdit && Item != null)
+        {
+            Model = new InventoryDto
+            {
+                Name = Item.Name,
+                Category = Item.Category,
+                Brand = Item.Brand,
+                Model = Item.Model,
+                Quantity = Item.Quantity,
+                MinQuantity = Item.MinQuantity,
+                UnitPrice = Item.UnitPrice,
+                SupplierName = Item.SupplierName,
+                SupplierPhone = Item.SupplierPhone,
+                BranchId = Item.BranchId
+            };
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(Model.Name))
+        {
+            Snackbar.Add("Name is required", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        StateHasChanged();
+
+        try
+        {
+            if (IsEdit && Item != null)
+            {
+                var r = await ApiService.PutAsync<ApiResponse>($"api/inventory/{Item.Id}", Model);
+                if (r?.Success == true) { Snackbar.Add("Item updated", Severity.Success); MudDialog.Close(DialogResult.Ok(true)); }
+                else Snackbar.Add("Failed to update item", Severity.Error);
+            }
+            else
+            {
+                var r = await ApiService.PostAsync<ApiResponse>($"api/inventory", Model);
+                if (r?.Success == true) { Snackbar.Add("Item added", Severity.Success); MudDialog.Close(DialogResult.Ok(true)); }
+                else Snackbar.Add("Failed to add item", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+            StateHasChanged();
+        }
+    }
+}

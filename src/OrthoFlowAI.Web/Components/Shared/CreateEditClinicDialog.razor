@@ -1,0 +1,206 @@
+@using OrthoFlowAI.Web.Services
+@using OrthoFlowAI.Web.Models
+@using CreateClinicRequest = OrthoFlowAI.Web.Models.ClinicCreateRequest
+@using UpdateClinicRequest = OrthoFlowAI.Web.Models.ClinicUpdateRequest
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Style="font-weight:600;margin-bottom:1.5rem;">
+            @(IsEdit ? "Edit Clinic" : "Create New Clinic")
+        </MudText>
+
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_clinic.Name" Label="Clinic Name *" Variant="Variant.Outlined" Required="true" FullWidth="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_clinic.Email" Label="Email" Variant="Variant.Outlined" Type="InputType.Email" FullWidth="true" />
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid Style="margin-top:1rem;">
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_clinic.Phone" Label="Phone" Variant="Variant.Outlined" FullWidth="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect T="string" @bind-Value="_clinic.Country" Label="Country" Variant="Variant.Outlined" FullWidth="true">
+                    <MudSelectItem T="string" Value="@("Saudi Arabia")">Saudi Arabia</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Egypt")">Egypt</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("UAE")">UAE</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Kuwait")">Kuwait</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Qatar")">Qatar</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Bahrain")">Bahrain</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Oman")">Oman</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Jordan")">Jordan</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Other")">Other</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid Style="margin-top:1rem;">
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_clinic.City" Label="City" Variant="Variant.Outlined" FullWidth="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_clinic.Address" Label="Address" Variant="Variant.Outlined" FullWidth="true" />
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid Style="margin-top:1rem;">
+            <MudItem xs="12" md="6">
+                <MudSelect T="string" @bind-Value="_clinic.SubscriptionPlan" Label="Subscription Plan" Variant="Variant.Outlined" FullWidth="true" Required="true">
+                    <MudSelectItem T="string" Value="@("Starter")">Starter - $99/mo</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Professional")">Professional - $299/mo</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Enterprise")">Enterprise - $999/mo</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect T="string" @bind-Value="_clinic.SubscriptionStatus" Label="Status" Variant="Variant.Outlined" FullWidth="true">
+                    <MudSelectItem T="string" Value="@("Trial")">Trial</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Active")">Active</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Expired")">Expired</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Suspended")">Suspended</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid Style="margin-top:1rem;">
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_clinic.PrimaryColor" Label="Primary Color" Variant="Variant.Outlined" FullWidth="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_clinic.SecondaryColor" Label="Secondary Color" Variant="Variant.Outlined" FullWidth="true" />
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid Style="margin-top:1rem;">
+            <MudItem xs="12" md="6">
+                <MudSwitch @bind-Value="_clinic.IsActive" Label="Active" Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect T="string" @bind-Value="_clinic.Language" Label="Language" Variant="Variant.Outlined" FullWidth="true">
+                    <MudSelectItem T="string" Value="@("English")">English</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Arabic")">Arabic</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+
+        @if (!IsEdit)
+        {
+            <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);margin-top:1rem;">
+                A default subscription will be created with the selected plan. You can modify limits later.
+            </MudText>
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" OnClick="Save" Disabled="_saving" Style="color:white;">
+            @if (_saving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Inherit" /> } else { @(IsEdit ? "Update" : "Create") }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public ClinicSummaryResponse? Clinic { get; set; }
+    [Parameter] public bool IsEdit { get; set; } = false;
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private bool _saving;
+    private ClinicCreateRequest _clinic = new();
+
+    protected override void OnInitialized()
+    {
+        if (IsEdit && Clinic != null)
+        {
+            _clinic = new CreateClinicRequest
+            {
+                Name = Clinic.Name,
+                Email = Clinic.Email,
+                Phone = Clinic.Phone,
+                Country = Clinic.Country ?? "Saudi Arabia",
+                City = Clinic.City ?? "",
+                SubscriptionPlan = Clinic.SubscriptionPlan ?? "Starter",
+                SubscriptionStatus = Clinic.SubscriptionStatus ?? "Trial",
+                PrimaryColor = "#6366f1",
+                SecondaryColor = "#06b6d4",
+                IsActive = Clinic.IsActive,
+                Language = "English"
+            };
+        }
+        else
+        {
+            _clinic = new CreateClinicRequest
+            {
+                SubscriptionPlan = "Starter",
+                SubscriptionStatus = "Trial",
+                PrimaryColor = "#6366f1",
+                SecondaryColor = "#06b6d4",
+                Country = "Saudi Arabia",
+                IsActive = true,
+                Language = "English"
+            };
+        }
+    }
+
+    private async Task Save()
+    {
+        _saving = true;
+        StateHasChanged();
+
+        try
+        {
+            ApiResponse<ClinicSummaryResponse>? result;
+            if (IsEdit && Clinic != null)
+            {
+                var updateRequest = new UpdateClinicRequest
+                {
+                    Name = _clinic.Name,
+                    Email = _clinic.Email,
+                    Phone = _clinic.Phone,
+                    Country = _clinic.Country,
+                    City = _clinic.City,
+                    Address = _clinic.Address,
+                    SubscriptionPlan = _clinic.SubscriptionPlan,
+                    SubscriptionStatus = _clinic.SubscriptionStatus,
+                    PrimaryColor = _clinic.PrimaryColor,
+                    SecondaryColor = _clinic.SecondaryColor,
+                    IsActive = _clinic.IsActive,
+                    Language = _clinic.Language
+                };
+                result = await ApiService.PutAsync<ApiResponse<ClinicSummaryResponse>>($"api/super-admin/clinics/{Clinic.Id}", updateRequest);
+            }
+            else
+            {
+                result = await ApiService.PostAsync<ApiResponse<ClinicSummaryResponse>>("api/super-admin/clinics", _clinic);
+            }
+
+            if (result?.Success == true)
+            {
+                Snackbar.Add(IsEdit ? "Clinic updated" : "Clinic created", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add(result?.Message ?? "Failed to save clinic", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

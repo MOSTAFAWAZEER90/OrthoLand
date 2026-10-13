@@ -1,0 +1,256 @@
+@page "/invoices"
+@rendermode InteractiveServer
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Invoices - OrthoFlowAI</PageTitle>
+
+<div class="page-header">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Invoices</MudText>
+        <MudText Typo="Typo.body2" Style="color:var(--text-secondary);margin-top:0.25rem;">
+            Track payments and manage billing
+        </MudText>
+    </div>
+    <div style="display:flex;gap:0.5rem;">
+        <MudButton StartIcon="@Icons.Material.Filled.FileDownload" Variant="Variant.Outlined" Size="Size.Small">
+            Export
+        </MudButton>
+        <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled"
+                   OnClick="OpenCreateDialog" Style="color:white;">
+            Create Invoice
+        </MudButton>
+    </div>
+</div>
+
+<MudGrid Style="margin-bottom:1.5rem;">
+    <MudItem xs="12" sm="6" md="3">
+        <StatCard Icon="@Icons.Material.Filled.Receipt"
+                  Value="@_invoices.Count.ToString()"
+                  Label="Total Invoices"
+                  Color="primary" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <StatCard Icon="@Icons.Material.Filled.CheckCircle"
+                  Value="@_invoices.Count(i => i.PaymentStatus == PaymentStatus.Paid).ToString()"
+                  Label="Paid"
+                  Color="success" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <StatCard Icon="@Icons.Material.Filled.Schedule"
+                  Value="@_invoices.Count(i => i.PaymentStatus == PaymentStatus.Pending || i.PaymentStatus == PaymentStatus.Partial).ToString()"
+                  Label="Pending"
+                  Color="warning" />
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <StatCard Icon="@Icons.Material.Filled.Warning"
+                  Value="@_invoices.Count(i => i.PaymentStatus == PaymentStatus.Overdue).ToString()"
+                  Label="Overdue"
+                  Color="danger" />
+    </MudItem>
+</MudGrid>
+
+<MudCard Class="content-card">
+    <div class="card-header" style="flex-wrap:wrap;gap:0.75rem;">
+        <div style="display:flex;align-items:center;gap:0.75rem;flex:1;flex-wrap:wrap;">
+            <MudTextField @bind-Value="_searchTerm"
+                          Placeholder="Search invoices..."
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          IconSize="Size.Small"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Style="max-width:300px;"
+                          Immediate="true"
+                          DebounceInterval="300"
+                          OnDebounceIntervalElapsed="Search" />
+
+            <MudSelect T="InvoiceStatus?" @bind-Value="_statusFilter" Label="Status"
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true"
+                       Style="min-width:150px;">
+                <MudSelectItem T="InvoiceStatus?" Value="null">All Statuses</MudSelectItem>
+                <MudSelectItem T="InvoiceStatus?" Value="InvoiceStatus.Draft">Draft</MudSelectItem>
+                <MudSelectItem T="InvoiceStatus?" Value="InvoiceStatus.Sent">Sent</MudSelectItem>
+                <MudSelectItem T="InvoiceStatus?" Value="InvoiceStatus.Paid">Paid</MudSelectItem>
+                <MudSelectItem T="InvoiceStatus?" Value="InvoiceStatus.Partial">Partial</MudSelectItem>
+                <MudSelectItem T="InvoiceStatus?" Value="InvoiceStatus.Overdue">Overdue</MudSelectItem>
+                <MudSelectItem T="InvoiceStatus?" Value="InvoiceStatus.Cancelled">Cancelled</MudSelectItem>
+            </MudSelect>
+        </div>
+    </div>
+
+    <MudTable T="InvoiceResponse" Items="@_invoices" Hover="true" Dense="false"
+              Loading="@_loading" LoadingProgressColor="Color.Primary"
+              FixedHeader="true" Height="calc(100vh - 440px)">
+        <HeaderContent>
+            <MudTh Style="font-weight:600;">Invoice #</MudTh>
+            <MudTh Style="font-weight:600;">Patient</MudTh>
+            <MudTh Style="font-weight:600;">Amount</MudTh>
+            <MudTh Style="font-weight:600;">Paid</MudTh>
+            <MudTh Style="font-weight:600;">Remaining</MudTh>
+            <MudTh Style="font-weight:600;">Status</MudTh>
+            <MudTh Style="font-weight:600;">Payment</MudTh>
+            <MudTh Style="font-weight:600;">Due Date</MudTh>
+            <MudTh Style="font-weight:600;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>
+                <MudText Typo="Typo.body2" Style="font-weight:600;color:var(--accent-primary);">
+                    @context.InvoiceNumber
+                </MudText>
+            </MudTd>
+            <MudTd>
+                <MudText Typo="Typo.body2" Style="font-weight:500;">@context.PatientName</MudText>
+                @if (!string.IsNullOrEmpty(context.DoctorName))
+                {
+                    <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Dr. @context.DoctorName</MudText>
+                }
+            </MudTd>
+            <MudTd>
+                <MudText Typo="Typo.body2" Style="font-weight:700;">
+                    $@context.TotalAmount.ToString("N2")
+                </MudText>
+            </MudTd>
+            <MudTd>
+                <MudText Typo="Typo.body2" Style="color:var(--success);font-weight:600;">
+                    $@context.PaidAmount.ToString("N2")
+                </MudText>
+            </MudTd>
+            <MudTd>
+                <MudText Typo="Typo.body2" Style="color:var(--danger);font-weight:600;">
+                    $@context.RemainingAmount.ToString("N2")
+                </MudText>
+            </MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Style="@GetInvoiceStatusStyle(context.Status)">
+                    @context.Status
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Style="@GetPaymentStatusStyle(context.PaymentStatus)">
+                    @context.PaymentStatus
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudText Typo="Typo.body2" Style="color:var(--text-secondary);">
+                    @(context.DueDate?.ToString("MMM dd, yyyy") ?? "—")
+                </MudText>
+            </MudTd>
+            <MudTd>
+                <div style="display:flex;gap:0.25rem;">
+                    @if (context.PaymentStatus != PaymentStatus.Paid)
+                    {
+                        <MudTooltip Text="Record Payment">
+                            <MudIconButton Icon="@Icons.Material.Filled.Payment" Size="Size.Small"
+                                           Style="color:var(--success);"
+                                           OnClick="@(() => RecordPayment(context))" />
+                        </MudTooltip>
+                    }
+                    <MudTooltip Text="View">
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small"
+                                       Style="color:var(--accent-primary);" />
+                    </MudTooltip>
+                </div>
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new[] { 10, 25, 50 }" HorizontalAlignment="HorizontalAlignment.End" />
+        </PagerContent>
+    </MudTable>
+</MudCard>
+
+@code {
+    private List<InvoiceResponse> _invoices = new();
+    private bool _loading = true;
+    private string _searchTerm = "";
+    private InvoiceStatus? _statusFilter;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInvoices();
+    }
+
+    private async Task LoadInvoices()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var filter = new InvoiceFilterRequest
+            {
+                PageNumber = 1,
+                PageSize = 100,
+                Status = _statusFilter
+            };
+
+            var result = await ApiService.PostAsync<PaginatedApiResponse<InvoiceResponse>>("api/invoices/filter", filter);
+            _invoices = result?.Success == true ? result.Data : new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load invoices: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Search() => await LoadInvoices();
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters<InvoiceDialog>
+        {
+            { x => x.Model, new CreateInvoiceRequest() }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<InvoiceDialog>("New Invoice", parameters, options);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadInvoices();
+        }
+    }
+
+    private async Task RecordPayment(InvoiceResponse invoice)
+    {
+        var parameters = new DialogParameters<RecordPaymentDialog>
+        {
+            { x => x.InvoiceId, invoice.Id },
+            { x => x.PatientId, invoice.PatientId },
+            { x => x.InvoiceNumber, invoice.InvoiceNumber },
+            { x => x.RemainingAmount, invoice.RemainingAmount }
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<RecordPaymentDialog>("Record Payment", parameters, options);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadInvoices();
+        }
+    }
+
+    private string GetInvoiceStatusStyle(InvoiceStatus status) => status switch
+    {
+        InvoiceStatus.Draft => "background:rgba(156,163,175,0.15);color:#6b7280;font-weight:600;",
+        InvoiceStatus.Sent => "background:var(--info-light);color:var(--info);font-weight:600;",
+        InvoiceStatus.Paid => "background:var(--success-light);color:var(--success);font-weight:600;",
+        InvoiceStatus.Partial => "background:var(--warning-light);color:var(--warning);font-weight:600;",
+        InvoiceStatus.Overdue => "background:var(--danger-light);color:var(--danger);font-weight:600;",
+        InvoiceStatus.Cancelled => "background:rgba(156,163,175,0.15);color:#6b7280;font-weight:600;",
+        _ => "background:var(--bg-tertiary);"
+    };
+
+    private string GetPaymentStatusStyle(PaymentStatus status) => status switch
+    {
+        PaymentStatus.Paid => "background:var(--success-light);color:var(--success);font-weight:600;",
+        PaymentStatus.Pending => "background:var(--warning-light);color:var(--warning);font-weight:600;",
+        PaymentStatus.Partial => "background:var(--info-light);color:var(--info);font-weight:600;",
+        PaymentStatus.Overdue => "background:var(--danger-light);color:var(--danger);font-weight:600;",
+        _ => "background:var(--bg-tertiary);"
+    };
+}

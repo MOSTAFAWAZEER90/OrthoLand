@@ -1,0 +1,43 @@
+@namespace OrthoFlowAI.Web.Components.Shared
+
+<div class="ba-slider" style="position:relative;width:100%;overflow:hidden;border-radius:var(--radius-lg);user-select:none;">
+    <img src="@AfterUrl" class="ba-img ba-after" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" />
+
+    <div class="ba-before-wrap" style="position:absolute;inset:0;width:100%;height:100%;clip-path:inset(0 @(100 - _position) + "% 0 0);">
+        <img src="@BeforeUrl" class="ba-img ba-before" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" />
+    </div>
+
+    <div class="ba-divider" style="position:absolute;top:0;bottom:0;left:@(_position + "%");width:3px;background:white;box-shadow:0 0 8px rgba(0,0,0,0.5);transform:translateX(-50%);pointer-events:none;">
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:white;color:#333;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-size:1rem;">
+            <MudIcon Icon="@Icons.Material.Filled.SwapHoriz" Size="Size.Small" />
+        </div>
+    </div>
+
+    <span class="ba-label ba-label-before" style="position:absolute;top:0.75rem;left:0.75rem;background:rgba(0,0,0,0.55);color:white;padding:0.25rem 0.6rem;border-radius:9999px;font-size:0.75rem;backdrop-filter:blur(4px);">Before</span>
+    <span class="ba-label ba-label-after" style="position:absolute;top:0.75rem;right:0.75rem;background:rgba(0,0,0,0.55);color:white;padding:0.25rem 0.6rem;border-radius:9999px;font-size:0.75rem;backdrop-filter:blur(4px);">After</span>
+
+    <input type="range" min="0" max="100" value="@_position"
+           class="ba-range"
+           @oninput="OnInput"
+           style="position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:ew-resize;z-index:5;" />
+</div>
+
+<style>
+    .ba-slider img { display: block; min-height: 220px; }
+</style>
+
+@code {
+    [Parameter] public string? BeforeUrl { get; set; }
+    [Parameter] public string? AfterUrl { get; set; }
+    [Parameter] public double Height { get; set; } = 300;
+
+    private double _position = 50;
+
+    private void OnInput(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out var val))
+        {
+            _position = val;
+        }
+    }
+}

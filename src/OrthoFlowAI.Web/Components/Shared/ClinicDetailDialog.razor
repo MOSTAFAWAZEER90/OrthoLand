@@ -1,0 +1,255 @@
+@using OrthoFlowAI.Web.Services
+@using OrthoFlowAI.Web.Models
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <div style="max-height:70vh;overflow-y:auto;">
+        <div style="display:flex;align-items:flex-start;gap:1rem;margin-bottom:1.5rem;">
+            <MudAvatar Style="width:64px;height:64px;font-size:1.5rem;background:var(--accent-gradient);color:white;font-weight:700;">
+                @(Clinic.Name.Length >= 2 ? Clinic.Name[..2].ToUpper() : Clinic.Name.ToUpper())
+            </MudAvatar>
+            <div style="flex:1;">
+                <MudText Typo="Typo.h6" Style="font-weight:700;">@Clinic.Name</MudText>
+                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">ID: @Clinic.Id</MudText>
+                <div style="display:flex;gap:1rem;margin-top:0.5rem;flex-wrap:wrap;">
+                    <MudChip T="string" Style="@GetPlanStyle(Clinic.SubscriptionPlan)">@Clinic.SubscriptionPlan</MudChip>
+                    <MudChip T="string" Style="@GetStatusStyle(Clinic.SubscriptionStatus, Clinic.IsActive)">@(Clinic.IsActive ? Clinic.SubscriptionStatus : "Inactive")</MudChip>
+                </div>
+            </div>
+        </div>
+
+        <MudTabs @bind-ActivePanelIndex="_activeTab" Elevation="0" Style="background:var(--bg-tertiary);border-radius:var(--radius-lg);">
+            <MudTabPanel Text="Overview" Icon="@Icons.Material.Filled.Dashboard">
+                <div style="padding:1.5rem;">
+                    <MudGrid>
+                        <MudItem xs="12" sm="6">
+                            <MudCard Style="background:var(--bg-card);border:1px solid var(--border-color);">
+                                <MudCardContent>
+                                    <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);font-weight:600;">Total Patients</MudText>
+                                    <MudText Typo="Typo.h5" Style="font-weight:700;color:var(--primary);">@Clinic.Stats.TotalPatients</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudCard Style="background:var(--bg-card);border:1px solid var(--border-color);">
+                                <MudCardContent>
+                                    <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);font-weight:600;">Total Doctors</MudText>
+                                    <MudText Typo="Typo.h5" Style="font-weight:700;color:var(--success);">@Clinic.Stats.TotalDoctors</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudCard Style="background:var(--bg-card);border:1px solid var(--border-color);">
+                                <MudCardContent>
+                                    <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);font-weight:600;">Total Staff</MudText>
+                                    <MudText Typo="Typo.h5" Style="font-weight:700;color:var(--info);">@Clinic.Stats.TotalStaff</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudCard Style="background:var(--bg-card);border:1px solid var(--border-color);">
+                                <MudCardContent>
+                                    <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);font-weight:600;">Branches</MudText>
+                                    <MudText Typo="Typo.h5" Style="font-weight:700;color:var(--warning);">@Clinic.Stats.TotalBranches</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudCard Style="background:var(--bg-card);border:1px solid var(--border-color);">
+                                <MudCardContent>
+                                    <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);font-weight:600;">Appointments</MudText>
+                                    <MudText Typo="Typo.h5" Style="font-weight:700;color:var(--secondary);">@Clinic.Stats.TotalAppointments</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudCard Style="background:var(--bg-card);border:1px solid var(--border-color);">
+                                <MudCardContent>
+                                    <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);font-weight:600;">Invoices</MudText>
+                                    <MudText Typo="Typo.h5" Style="font-weight:700;color:var(--tertiary);">@Clinic.Stats.TotalInvoices</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                    </MudGrid>
+
+                    <MudDivider Style="margin:1.5rem 0;" />
+
+                    <MudGrid>
+                        <MudItem xs="12" sm="6">
+                            <MudCard Style="background:var(--bg-card);border:1px solid var(--border-color);">
+                                <MudCardContent>
+                                    <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);font-weight:600;">Total Revenue</MudText>
+                                    <MudText Typo="Typo.h5" Style="font-weight:700;color:var(--success);">$@Clinic.Stats.TotalRevenue.ToString("N0")</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudCard Style="background:var(--bg-card);border:1px solid var(--border-color);">
+                                <MudCardContent>
+                                    <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);font-weight:600;">Outstanding Balance</MudText>
+                                    <MudText Typo="Typo.h5" Style="font-weight:700;color:var(--danger);">$@Clinic.Stats.OutstandingBalance.ToString("N0")</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudCard Style="background:var(--bg-card);border:1px solid var(--border-color);">
+                                <MudCardContent>
+                                    <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);font-weight:600;">Active Subscriptions</MudText>
+                                    <MudText Typo="Typo.h5" Style="font-weight:700;color:var(--info);">@Clinic.Stats.ActiveSubscriptions</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                    </MudGrid>
+                </div>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Details" Icon="@Icons.Material.Filled.Info">
+                <div style="padding:1.5rem;">
+                    <MudGrid>
+                        <MudItem xs="12" md="6">
+                            <MudText Typo="Typo.h6" Style="font-weight:600;margin-bottom:1rem;">Contact Information</MudText>
+                            <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                                @if (!string.IsNullOrEmpty(Clinic.Email))
+                                {
+                                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                                        <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small" Style="color:var(--text-tertiary);" />
+                                        <MudText Typo="Typo.body2">@Clinic.Email</MudText>
+                                    </div>
+                                }
+                                @if (!string.IsNullOrEmpty(Clinic.Phone))
+                                {
+                                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                                        <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" Style="color:var(--text-tertiary);" />
+                                        <MudText Typo="Typo.body2">@Clinic.Phone</MudText>
+                                    </div>
+                                }
+                                @if (!string.IsNullOrEmpty(Clinic.Address))
+                                {
+                                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                                        <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" Style="color:var(--text-tertiary);" />
+                                        <MudText Typo="Typo.body2">@Clinic.Address, @Clinic.City, @Clinic.Country</MudText>
+                                    </div>
+                                }
+                                @if (!string.IsNullOrEmpty(Clinic.Website))
+                                {
+                                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                                        <MudIcon Icon="@Icons.Material.Filled.Language" Size="Size.Small" Style="color:var(--text-tertiary);" />
+                                        <MudText Typo="Typo.body2">@Clinic.Website</MudText>
+                                    </div>
+                                }
+                            </div>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudText Typo="Typo.h6" Style="font-weight:600;margin-bottom:1rem;">Business Information</MudText>
+                            <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                                <div style="display:flex;align-items:center;gap:0.5rem;">
+                                    <MudIcon Icon="@Icons.Material.Filled.AccessTime" Size="Size.Small" Style="color:var(--text-tertiary);" />
+                                    <MudText Typo="Typo.body2">Hours: @(Clinic.BusinessHours ?? "Not set")</MudText>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:0.5rem;">
+                                    <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Size="Size.Small" Style="color:var(--text-tertiary);" />
+                                    <MudText Typo="Typo.body2">Working Days: @(Clinic.WorkingDays ?? "Not set")</MudText>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:0.5rem;">
+                                    <MudIcon Icon="@Icons.Material.Filled.Palette" Size="Size.Small" Style="color:var(--text-tertiary);" />
+                                    <MudText Typo="Typo.body2">Primary: @Clinic.PrimaryColor</MudText>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:0.5rem;">
+                                    <MudIcon Icon="@Icons.Material.Filled.Palette" Size="Size.Small" Style="color:var(--text-tertiary);" />
+                                    <MudText Typo="Typo.body2">Secondary: @Clinic.SecondaryColor</MudText>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:0.5rem;">
+                                    <MudIcon Icon="@Icons.Material.Filled.Translate" Size="Size.Small" Style="color:var(--text-tertiary);" />
+                                    <MudText Typo="Typo.body2">Language: @Clinic.Language</MudText>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:0.5rem;">
+                                    <MudIcon Icon="@Icons.Material.Filled.Event" Size="Size.Small" Style="color:var(--text-tertiary);" />
+                                    <MudText Typo="Typo.body2">Created: @Clinic.CreatedAt.ToString("MMM dd, yyyy")</MudText>
+                                </div>
+                            </div>
+                        </MudItem>
+                    </MudGrid>
+                </div>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Subscription" Icon="@Icons.Material.Filled.CreditCard">
+                <div style="padding:1.5rem;">
+                    <MudCard Style="background:var(--bg-card);border:1px solid var(--border-color);">
+                        <MudCardContent>
+                            <MudGrid>
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.h6" Style="font-weight:600;margin-bottom:1rem;">Subscription Plan</MudText>
+                                    <MudChip T="string" Size="Size.Large" Style="@GetPlanStyle(Clinic.SubscriptionPlan)">@Clinic.SubscriptionPlan</MudChip>
+                                    <MudText Typo="Typo.body2" Style="color:var(--text-secondary);margin-top:0.5rem;">
+                                        @GetPlanDescription(Clinic.SubscriptionPlan)
+                                    </MudText>
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudText Typo="Typo.h6" Style="font-weight:600;margin-bottom:1rem;">Status & Billing</MudText>
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                                        <div>
+                                            <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Status</MudText>
+                                            <MudChip T="string" Style="@GetStatusStyle(Clinic.SubscriptionStatus, Clinic.IsActive)">@Clinic.SubscriptionStatus</MudChip>
+                                        </div>
+                                        <div>
+                                            <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Billing Period</MudText>
+                                            <MudText Typo="Typo.body2" Style="font-weight:600;">Monthly</MudText>
+                                        </div>
+                                    </div>
+                                </MudItem>
+                            </MudGrid>
+                        </MudCardContent>
+                    </MudCard>
+                </div>
+            </MudTabPanel>
+        </MudTabs>
+        </div>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" OnClick="Close" Style="color:white;">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public ClinicDetailResponse Clinic { get; set; } = new();
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private int _activeTab = 0;
+
+    private void Close()
+    {
+        MudDialog.Close();
+    }
+
+    private string GetPlanStyle(string? plan) => plan switch
+    {
+        "Starter" => "background:var(--info-light);color:var(--info);font-weight:600;",
+        "Professional" => "background:var(--primary-light);color:var(--primary);font-weight:600;",
+        "Enterprise" => "background:var(--warning-light);color:var(--warning);font-weight:600;",
+        _ => "background:var(--bg-tertiary);"
+    };
+
+    private string GetStatusStyle(string? status, bool isActive)
+    {
+        if (!isActive) return "background:var(--bg-tertiary);color:var(--text-tertiary);font-weight:600;";
+        return status switch
+        {
+            "Active" => "background:var(--success-light);color:var(--success);font-weight:600;",
+            "Trial" => "background:var(--warning-light);color:var(--warning);font-weight:600;",
+            "Expired" or "Cancelled" => "background:var(--danger-light);color:var(--danger);font-weight:600;",
+            _ => "background:var(--info-light);color:var(--info);font-weight:600;"
+        };
+    }
+
+    private string GetPlanDescription(string? plan) => plan switch
+    {
+        "Starter" => "Up to 300 patients, 2 users, 1 branch, basic features",
+        "Professional" => "Unlimited patients, 10 users, 5 branches, WhatsApp, AI Reports, advanced analytics",
+        "Enterprise" => "Unlimited everything, custom branding, API access, dedicated support, white-label app",
+        _ => "Basic features"
+    };
+}

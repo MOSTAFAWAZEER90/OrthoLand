@@ -1,0 +1,44 @@
+**/.git
+**/.vs
+**/.vscode
+**/.idea
+**/bin
+**/obj
+**/node_modules
+**/dist
+**/.gitignore
+**/README.md
+**/LICENSE
+
+# Docker
+docker-compose*.yml
+.env*
+!.env.example
+**/Dockerfile*
+
+# IDE
+**/*.sln
+**/*.csproj.user
+**/*.suo
+**/*.user
+
+# Build results
+**/[Dd]ebug/
+**/[Rr]elease/
+**/x64/
+**/x86/
+
+# NuGet
+**/*.nupkg
+**/*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+
+# Logs
+**/Logs/
+**/logs/
+
+# OS
+**/Thumbs.db
+**/ehthumbs.db
+**/.DS_Store

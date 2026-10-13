@@ -1,0 +1,252 @@
+@page "/dashboard"
+@rendermode InteractiveServer
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+
+<PageTitle>Dashboard - OrthoFlowAI</PageTitle>
+
+<div class="page-header">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Dashboard</MudText>
+        <MudText Typo="Typo.body2" Style="color:var(--text-secondary);margin-top:0.25rem;">
+            Welcome back! Here's what's happening at your clinic today.
+        </MudText>
+    </div>
+    <div style="display:flex;gap:0.5rem;">
+        <MudButton StartIcon="@Icons.Material.Filled.FileDownload" Variant="Variant.Outlined" Size="Size.Small">
+            Export
+        </MudButton>
+        <MudButton StartIcon="@Icons.Material.Filled.Refresh" Variant="Variant.Outlined" Size="Size.Small"
+                   OnClick="LoadDashboard">
+            Refresh
+        </MudButton>
+    </div>
+</div>
+
+@if (_loading)
+{
+    <LoadingSpinner Message="Loading dashboard data..." />
+}
+else
+{
+    <div class="fade-in">
+        <MudGrid >
+            <MudItem xs="12" sm="6" md="3">
+                <StatCard Icon="@Icons.Material.Filled.People"
+                          Value="@(_dashboard?.TotalPatients.ToString("N0") ?? "0")"
+                          Label="Total Patients"
+                          Color="primary"
+                          Trend="+12%"
+                          TrendUp="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <StatCard Icon="@Icons.Material.Filled.CalendarMonth"
+                          Value="@(_dashboard?.TodayAppointments.ToString() ?? "0")"
+                          Label="Today's Appointments"
+                          Color="info"
+                          Trend="+3"
+                          TrendUp="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <StatCard Icon="@Icons.Material.Filled.AttachMoney"
+                          Value="@($"${_dashboard?.MonthlyRevenue:N0}" ?? "$0")"
+                          Label="Monthly Revenue"
+                          Color="success"
+                          Trend="+8.2%"
+                          TrendUp="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <StatCard Icon="@Icons.Material.Filled.MedicalServices"
+                          Value="@(_dashboard?.CompletedTreatments.ToString() ?? "0")"
+                          Label="Active Treatments"
+                          Color="warning"
+                          Trend="-2%"
+                          TrendUp="false" />
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid Style="margin-top:1.5rem;">
+            <MudItem xs="12" md="8">
+                <MudCard Class="content-card">
+                    <div class="card-header">
+                        <div>
+                            <MudText Typo="Typo.h6" Style="font-weight:600;">Recent Activity</MudText>
+                            <MudText Typo="Typo.body2" Style="color:var(--text-secondary);">Latest actions in your clinic</MudText>
+                        </div>
+                        <MudButton Href="/appointments" Size="Size.Small" Variant="Variant.Text" Style="color:var(--accent-primary);">
+                            View All
+                        </MudButton>
+                    </div>
+                    <div style="padding:0.5rem 1.5rem 1.5rem;">
+                        @if (_dashboard?.RecentActivity?.Any() == true)
+                        {
+                            @foreach (var activity in _dashboard.RecentActivity.Take(8))
+                            {
+                                <div class="timeline-item" style="padding-top:0.75rem;">
+                                    <MudText Typo="Typo.body2" Style="font-weight:500;color:var(--text-primary);">
+                                        @activity.Description
+                                    </MudText>
+                                    <div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.25rem;">
+                                        <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">
+                                            @activity.Timestamp.ToString("MMM dd, h:mm tt")
+                                        </MudText>
+                                        @if (!string.IsNullOrEmpty(activity.PerformedBy))
+                                        {
+                                            <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">
+                                                by @activity.PerformedBy
+                                            </MudText>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div style="text-align:center;padding:2rem;">
+                                <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Large" Style="color:var(--text-tertiary);" />
+                                <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);margin-top:0.5rem;">No recent activity</MudText>
+                            </div>
+                        }
+                    </div>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudCard Class="content-card" Style="margin-bottom:1.5rem;">
+                    <div class="card-header">
+                        <MudText Typo="Typo.h6" Style="font-weight:600;">Quick Actions</MudText>
+                    </div>
+                    <div style="padding:1rem 1.5rem;display:flex;flex-direction:column;gap:0.5rem;">
+                        <MudButton Href="/patients" StartIcon="@Icons.Material.Filled.PersonAdd"
+                                   Variant="Variant.Outlined" FullWidth="true"
+                                   Style="justify-content:flex-start;text-transform:none;">
+                            New Patient
+                        </MudButton>
+                        <MudButton Href="/appointments" StartIcon="@Icons.Material.Filled.EventAvailable"
+                                   Variant="Variant.Outlined" FullWidth="true"
+                                   Style="justify-content:flex-start;text-transform:none;">
+                            Book Appointment
+                        </MudButton>
+                        <MudButton Href="/invoices" StartIcon="@Icons.Material.Filled.ReceiptLong"
+                                   Variant="Variant.Outlined" FullWidth="true"
+                                   Style="justify-content:flex-start;text-transform:none;">
+                            Create Invoice
+                        </MudButton>
+                        <MudButton Href="/ai" StartIcon="@Icons.Material.Filled.AutoAwesome"
+                                   Variant="Variant.Outlined" FullWidth="true"
+                                   Style="justify-content:flex-start;text-transform:none;color:var(--accent-primary);border-color:var(--accent-primary);">
+                            AI Treatment Plan
+                        </MudButton>
+                    </div>
+                </MudCard>
+
+                <MudCard Class="content-card">
+                    <div class="card-header">
+                        <MudText Typo="Typo.h6" Style="font-weight:600;">Top Doctors</MudText>
+                    </div>
+                    <div style="padding:0.5rem 1.5rem 1.5rem;">
+                        @if (_dashboard?.TopDoctors?.Any() == true)
+                        {
+                            @foreach (var doctor in _dashboard.TopDoctors.Take(5))
+                            {
+                                <div style="display:flex;align-items:center;gap:0.75rem;padding:0.625rem 0;border-bottom:1px solid var(--border-light);">
+                                    <MudAvatar Size="Size.Small" Style="background:var(--accent-gradient);color:white;font-weight:600;font-size:0.75rem;">
+                                        @(doctor.DoctorName.Length >= 2 ? doctor.DoctorName[..2].ToUpper() : doctor.DoctorName.ToUpper())
+                                    </MudAvatar>
+                                    <div style="flex:1;min-width:0;">
+                                        <MudText Typo="Typo.body2" Style="font-weight:600;">@doctor.DoctorName</MudText>
+                                        <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">@doctor.PatientsCount patients</MudText>
+                                    </div>
+                                    <div style="text-align:right;">
+                                        <MudText Typo="Typo.body2" Style="font-weight:600;color:var(--success);">
+                                            $@doctor.Revenue.ToString("N0")
+                                        </MudText>
+                                        <div style="display:flex;align-items:center;gap:2px;justify-content:flex-end;">
+                                            <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Style="color:var(--warning);font-size:0.875rem;" />
+                                            <MudText Typo="Typo.caption" Style="color:var(--text-secondary);">@doctor.SatisfactionScore.ToString("F1")</MudText>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);text-align:center;padding:1rem;">
+                                No doctor data available
+                            </MudText>
+                        }
+                    </div>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid Style="margin-top:1.5rem;">
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Class="content-card" Style="padding:1.25rem;text-align:center;">
+                    <MudIcon Icon="@Icons.Material.Filled.EventAvailable" Size="Size.Large" Style="color:var(--success);" />
+                    <MudText Typo="Typo.h5" Style="font-weight:700;margin-top:0.5rem;">
+                        @(_dashboard?.UpcomingAppointments.ToString() ?? "0")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Style="color:var(--text-secondary);">Upcoming</MudText>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Class="content-card" Style="padding:1.25rem;text-align:center;">
+                    <MudIcon Icon="@Icons.Material.Filled.EventBusy" Size="Size.Large" Style="color:var(--warning);" />
+                    <MudText Typo="Typo.h5" Style="font-weight:700;margin-top:0.5rem;">
+                        @(_dashboard?.MissedAppointments.ToString() ?? "0")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Style="color:var(--text-secondary);">Missed</MudText>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Class="content-card" Style="padding:1.25rem;text-align:center;">
+                    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Large" Style="color:var(--accent-primary);" />
+                    <MudText Typo="Typo.h5" Style="font-weight:700;margin-top:0.5rem;">
+                        @(_dashboard?.TreatmentCompletionRate.ToString("P0") ?? "0%")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Style="color:var(--text-secondary);">Completion Rate</MudText>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Class="content-card" Style="padding:1.25rem;text-align:center;">
+                    <MudIcon Icon="@Icons.Material.Filled.SentimentSatisfied" Size="Size.Large" Style="color:var(--info);" />
+                    <MudText Typo="Typo.h5" Style="font-weight:700;margin-top:0.5rem;">
+                        @(_dashboard?.PatientSatisfaction.ToString("F1") ?? "0.0")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Style="color:var(--text-secondary);">Satisfaction</MudText>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    </div>
+}
+
+@code {
+    private DashboardResponse? _dashboard;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboard();
+    }
+
+    private async Task LoadDashboard()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            _dashboard = await ApiService.GetAsync<DashboardResponse>("api/dashboard");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load dashboard: {ex.Message}", Severity.Warning);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+}

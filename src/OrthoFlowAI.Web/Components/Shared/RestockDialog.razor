@@ -1,0 +1,64 @@
+@namespace OrthoFlowAI.Web.Components.Shared
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+            <MudIcon Icon="@Icons.Material.Filled.AddCircleOutline" Color="Color.Primary" Size="Size.Medium" />
+            <MudText Typo="Typo.h6" Style="font-weight:600;">Restock @Item.Name</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Style="color:var(--text-secondary);margin-bottom:1rem;">
+            Current stock: <strong>@Item.Quantity</strong> (min: @Item.MinQuantity)
+        </MudText>
+        <MudNumericField @bind-Value="_quantity" Label="Quantity to add" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" FullWidth="true" />
+        <MudText Typo="Typo.body2" Style="color:var(--success);margin-top:0.5rem;">
+            New stock will be: @(Item.Quantity + _quantity)
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined" Style="margin-right:0.5rem;">Cancel</MudButton>
+        <MudButton OnClick="Restock" Color="Color.Primary" Variant="Variant.Filled" Style="color:white;" Disabled="_saving || _quantity <= 0">
+            @if (_saving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> } else { @("Restock") }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public InventoryItem Item { get; set; } = new();
+
+    private int _quantity = 0;
+    private bool _saving;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Restock()
+    {
+        if (_quantity <= 0) return;
+        _saving = true;
+        StateHasChanged();
+
+        try
+        {
+            var r = await ApiService.PostAsync<ApiResponse>($"api/inventory/{Item.Id}/restock", new RestockRequest { Quantity = _quantity });
+            if (r?.Success == true)
+            {
+                Snackbar.Add($"Added {_quantity} units", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else Snackbar.Add("Failed to restock", Severity.Error);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+            StateHasChanged();
+        }
+    }
+}

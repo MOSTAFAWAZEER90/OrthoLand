@@ -1,0 +1,51 @@
+@using OrthoFlowAI.Web.Models
+@inject NavigationManager Navigation
+
+<MudCard Class="content-card" Style="position:relative;padding:0;border-radius:16px;overflow:hidden;transition:transform 0.2s,box-shadow 0.2s;"
+        Elevation="@(Plan.IsPopular ? 4 : 1)">
+    @if (Plan.IsPopular)
+    {
+        <div style="background:var(--accent-gradient);color:white;padding:0.5rem;text-align:center;font-weight:600;font-size:0.875rem;">
+            Most Popular
+        </div>
+    }
+    
+    <MudCardContent Style="padding:2rem;">
+        <div style="text-align:center;margin-bottom:1.5rem;">
+            <MudText Typo="Typo.h6" Style="font-weight:700;color:var(--text-primary);">@Plan.Name</MudText>
+            <MudText Typo="Typo.body2" Style="color:var(--text-secondary);margin-top:0.5rem;">@Plan.Description</MudText>
+        </div>
+        
+        <div style="text-align:center;margin-bottom:2rem;">
+            <div style="display:flex;align-items:baseline;justify-content:center;gap:0.25rem;">
+                <MudText Typo="Typo.h2" Style="font-weight:800;color:var(--text-primary);">@Plan.PriceMonthly</MudText>
+                <MudText Typo="Typo.body1" Style="color:var(--text-tertiary);">/month</MudText>
+            </div>
+            <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);margin-top:0.25rem;">
+                Or $@Plan.PriceYearly/year (save @(Plan.PriceMonthly * 12 - Plan.PriceYearly)/month)
+            </MudText>
+        </div>
+        
+        <MudDivider Style="margin:1.5rem 0;" />
+        
+        <ul style="list-style:none;padding:0;margin:0 0 2rem;">
+            @foreach (var feature in Plan.Features)
+            {
+                <li style="display:flex;align-items:flex-start;gap:0.75rem;padding:0.5rem 0;border-bottom:1px solid var(--border-light);">
+                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" Style="color:var(--success);flex-shrink:0;margin-top:2px;" />
+                    <MudText Typo="Typo.body2" Style="color:var(--text-secondary);line-height:1.5;">@feature</MudText>
+                </li>
+            }
+        </ul>
+        
+        <MudButton Variant="@(Plan.IsPopular ? Variant.Filled : Variant.Outlined)" FullWidth="true" Size="Size.Large" 
+                   Style="@(Plan.IsPopular ? "background:var(--accent-gradient);color:white;" : "border-color:var(--primary);color:var(--primary);")"
+                   OnClick="@(() => Navigation.NavigateTo("/login"))">
+            @(Plan.IsPopular ? "Start Free Trial" : "Choose Plan")
+        </MudButton>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    [Parameter] public PricingPlan Plan { get; set; } = default!;
+}

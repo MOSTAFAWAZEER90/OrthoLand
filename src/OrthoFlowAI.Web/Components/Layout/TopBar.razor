@@ -1,0 +1,87 @@
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+
+<div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:1rem;">
+    <div style="flex:1;max-width:480px;">
+        <MudTextField @bind-Value="_searchTerm"
+                      Placeholder="Search patients, appointments, invoices..."
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Small"
+                      Variant="Variant.Outlined"
+                      Margin="Margin.Dense"
+                      Style="background:var(--bg-tertiary);border-radius:var(--radius-md);"
+                      Immediate="true"
+                      OnKeyDown="OnSearchKeyDown" />
+    </div>
+
+    <div style="display:flex;align-items:center;gap:0.5rem;">
+        <MudTooltip Text="@(IsDarkMode ? "Light mode" : "Dark mode")">
+            <MudIconButton Icon="@(IsDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                           Size="Size.Medium"
+                           OnClick="OnToggleDarkMode"
+                           Style="color:var(--text-secondary);" />
+        </MudTooltip>
+
+        <MudTooltip Text="Notifications">
+            <MudBadge Content="@_notificationCount" Color="Color.Error" Overlap="true" Visible="@(_notificationCount > 0)">
+                <MudIconButton Icon="@Icons.Material.Filled.Notifications"
+                               Size="Size.Medium"
+                               Style="color:var(--text-secondary);" />
+            </MudBadge>
+        </MudTooltip>
+
+        <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+            <ActivatorContent>
+                <div style="display:flex;align-items:center;gap:0.5rem;padding:0.25rem 0.5rem;border-radius:var(--radius-md);cursor:pointer;transition:background var(--transition-fast);"
+                     @onmouseover="@(e => { })">
+                    <MudAvatar Size="Size.Small" Style="background:var(--accent-gradient);color:white;font-weight:600;font-size:0.75rem;">
+                        @_userInitials
+                    </MudAvatar>
+                    <MudText Style="color:var(--text-primary);font-weight:500;font-size:0.875rem;">@_userName</MudText>
+                    <MudIcon Icon="@Icons.Material.Filled.KeyboardArrowDown" Size="Size.Small" Style="color:var(--text-tertiary);" />
+                </div>
+            </ActivatorContent>
+            <ChildContent>
+                <MudMenuItem Icon="@Icons.Material.Filled.Person" Href="/settings">Profile</MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Filled.Settings" Href="/settings">Settings</MudMenuItem>
+                <MudDivider />
+                <MudMenuItem Icon="@Icons.Material.Filled.Logout" OnClick="HandleLogout" Style="color:var(--danger);">Logout</MudMenuItem>
+            </ChildContent>
+        </MudMenu>
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool IsDarkMode { get; set; }
+    [Parameter] public EventCallback OnToggleDarkMode { get; set; }
+
+    private string _searchTerm = "";
+    private string _userName = "User";
+    private string _userInitials = "U";
+    private int _notificationCount = 3;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await AuthService.GetCurrentUserAsync();
+        if (user != null)
+        {
+            _userName = $"{user.FirstName} {user.LastName}";
+            _userInitials = $"{(user.FirstName.Length > 0 ? user.FirstName[0] : "")}{(user.LastName.Length > 0 ? user.LastName[0] : "")}";
+        }
+    }
+
+    private void OnSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_searchTerm))
+        {
+            Navigation.NavigateTo($"/patients?search={Uri.EscapeDataString(_searchTerm)}");
+        }
+    }
+
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/login", forceLoad: true);
+    }
+}

@@ -1,0 +1,27 @@
+@using OrthoFlowAI.Web.Models
+
+<div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:16px;padding:2rem;transition:transform 0.2s,box-shadow 0.2s;" 
+     onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 20px 40px -12px rgba(0,0,0,0.15)'"
+     onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='none'">
+    <div style="width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:1.5rem;background:@($"rgba({GetColorRgb(Feature.Color)},0.1)");color:@($"var(--{Feature.Color})");">
+        <MudIcon Icon="@Feature.Icon" Size="Size.Large" />
+    </div>
+    <MudText Typo="Typo.h6" Style="font-weight:700;margin-bottom:0.75rem;color:var(--text-primary);">@Feature.Title</MudText>
+    <MudText Typo="Typo.body2" Style="color:var(--text-secondary);line-height:1.7;">@Feature.Description</MudText>
+</div>
+
+@code {
+    [Parameter] public FeatureItem Feature { get; set; } = default!;
+    
+    private string GetColorRgb(string color) => color switch
+    {
+        "primary" => "99, 102, 241",
+        "secondary" => "236, 72, 153",
+        "success" => "16, 185, 129",
+        "warning" => "245, 158, 11",
+        "info" => "6, 182, 212",
+        "danger" => "239, 68, 68",
+        "tertiary" => "139, 92, 246",
+        _ => "99, 102, 241"
+    };
+}

@@ -1,0 +1,489 @@
+# OrthoFlowAI - Project Description & Status Report
+## AI-Powered Orthodontic Practice Management SaaS Platform
+
+---
+
+## 1. PROJECT OVERVIEW
+
+**OrthoFlowAI** is a multi-tenant SaaS platform for orthodontic clinics. It manages patients, appointments, payments, treatment progress, AI-powered reports, photo management, communication, and more.
+
+**Tech Stack:**
+- Backend: ASP.NET Core 10 Web API
+- Frontend: Blazor Web App (Server Interactive) + MudBlazor
+- Database: PostgreSQL (via EF Core 10)
+- Cache: Redis (StackExchange.Redis)
+- Auth: ASP.NET Core Identity + JWT Bearer
+- AI: OpenAI API integration
+- Email: SendGrid
+- Real-time: SignalR
+- Architecture: Clean Architecture (Domain → Application → Infrastructure → API/Web)
+
+**Target:** Premium SaaS similar to Notion/Stripe/Linear/HubSpot
+
+---
+
+## 2. WHAT HAS BEEN BUILT (Current State)
+
+### Solution Structure (5 projects, 127+ files)
+```
+OrthoFlowAI/
+├── src/
+│   ├── OrthoFlowAI.Domain/           - Domain layer (entities, enums, interfaces)
+│   ├── OrthoFlowAI.Application/      - Business logic (DTOs, validators, mappings)
+│   ├── OrthoFlowAI.Infrastructure/   - Data access, external services
+│   ├── OrthoFlowAI.Api/             - REST API (ASP.NET Core)
+│   └── OrthoFlowAI.Web/            - Blazor Server UI (MudBlazor)
+├── docker-compose.yml
+├── .env.example
+└── .dockerignore
+```
+
+### Domain Layer (21 Entities)
+All entities are fully implemented with proper relationships:
+
+| Entity | Description |
+|--------|------------|
+| `Clinic` | Tenant entity - each clinic is isolated |
+| `ApplicationUser` | Identity user (Domain layer, NOT IdentityUser) |
+| `ApplicationIdentityUser` | Identity user (Infrastructure layer, inherits IdentityUser) |
+| `Doctor` | Doctor profile linked to user |
+| `Patient` | Full patient profile with treatment info, scores |
+| `Branch` | Multi-branch support per clinic |
+| `Appointment` | Calendar appointments with status management |
+| `TreatmentVisit` | Each visit records wire changes, brackets, notes |
+| `Photo` | Patient photos organized by category/month |
+| `Invoice` | Billing with items, discounts, taxes |
+| `Payment` | Payment records linked to invoices |
+| `Document` | Consent forms, X-rays, reports |
+| `Notification` | In-app notifications with channels |
+| `PainReport` | Weekly pain tracking by patients |
+| `EmergencyRequest` | Patient emergency submissions |
+| `InventoryItem` | Clinic inventory (brackets, wires, etc.) |
+| `Staff` | Non-doctor staff management |
+| `ChatMessage` | Real-time messaging |
+| `Referral` | Patient referral system |
+| `Subscription` | SaaS subscription plans |
+| `Feedback` | Patient ratings and surveys |
+| `AuditLog` | System audit trail |
+
+**Key Architecture Decisions:**
+- `TenantEntity` base class with `ClinicId` + EF Core query filter for multi-tenant isolation
+- Soft delete pattern (`IsDeleted` flag)
+- Audit fields (`CreatedAt`, `UpdatedAt`, `CreatedBy`, `UpdatedBy`)
+- `BaseEntity` with GUID primary keys
+
+**Enums (20+):** UserRole, Gender, PatientStatus, AppointmentStatus, AppointmentType, PaymentStatus, PaymentMethod, InvoiceStatus, SubscriptionPlan, SubscriptionStatus, NotificationType, NotificationChannel, DocumentType, PhotoCategory, TreatmentType, EmergencySeverity, StaffStatus, PainLevel, InventoryCategory, FeedbackType, Language
+
+### Application Layer
+- **DTOs:** Auth, Clinic, Patient, Appointment, Invoice, Dashboard, Photo, Notification, Treatment, Common (pagination)
+- **Validators:** FluentValidation for Clinic, Patient, Appointment, Invoice DTOs
+- **Mappings:** AutoMapper profile (entity ↔ DTO)
+- **Service Registration:** `AddApplication()` extension method
+
+### Infrastructure Layer
+- **DbContext:** `ApplicationDbContext` inheriting `IdentityDbContext<ApplicationIdentityUser>` with:
+  - All 21 DbSets
+  - Multi-tenant query filter (EF Core Global Query Filter)
+  - Soft delete query filter
+  - Snake_case table naming convention
+  - Fluent API configurations (indexes, relationships, decimal precision)
+  - Auto-audit in `SaveChangesAsync`
+- **Repositories:** Generic `IRepository<T>` + `UnitOfWork` pattern
+- **Services (8 pairs):**
+  - `IAuthService` / `AuthService` - JWT token generation, register, login, refresh, logout
+  - `IClinicService` / `ClinicService` - CRUD with search
+  - `IPatientService` / `PatientService` - CRUD with filtering, pagination
+  - `IAppointmentService` / `AppointmentService` - CRUD, calendar events, conflict detection
+  - `IInvoiceService` / `InvoiceService` - CRUD, payments, revenue reports
+  - `IDashboardService` / `DashboardService` - Statistics, charts data
+  - `INotificationService` / `NotificationService` - CRUD, mark read, unread count
+  - `IEmailService` / `EmailService` - SendGrid email sending
+  - `IAIService` / `AIService` - OpenAI API for reports, summaries, recommendations
+- **Identity:** Custom `ApplicationUserManager` and `ApplicationRoleManager`
+- **Redis:** `IRedisCacheService` with Get/Set/Remove/Exists
+- **Settings:** `JwtSettings`, `SendGridSettings`, `OpenAISettings` (Options pattern)
+- **DI Registration:** `AddInfrastructure()` extension method
+
+### API Layer
+- **Controllers (8):** Auth, Clinics, Patients, Appointments, Invoices, Dashboard, Notifications, AI
+- **Middleware (3):** ExceptionHandling, Audit, Tenant (extracts ClinicId from JWT)
+- **SignalR Hub:** `NotificationHub` for real-time notifications
+- **Swagger:** Full OpenAPI documentation with JWT support
+- **Rate Limiting:** Fixed window + sliding window + IP-based policies
+- **Health Checks:** /health, /health/ready, /health/live
+- **Serilog:** Console + file logging
+
+### Blazor Frontend
+- **Layout:** Sidebar + TopBar with MudBlazor
+  - SidebarNav with navigation links and icons
+  - TopBar with search, notifications badge, dark mode toggle, profile menu
+  - LoginLayout (minimal) and MainLayout (with sidebar)
+- **Pages (10):**
+  - `Dashboard` (`/`) - Stat cards, recent activity, quick actions
+  - `Patients` (`/patients`) - Searchable data table with filters
+  - `PatientProfile` (`/patients/{Id}`) - Tabs: Overview, Timeline, Photos, Appointments, Invoices, Notes
+  - `Appointments` (`/appointments`) - Calendar view (month/week/day)
+  - `Invoices` (`/invoices`) - Filterable table with payment recording
+  - `AI` (`/ai`) - AI tools interface
+  - `Settings` (`/settings`) - Clinic profile, branding, business hours
+  - `Login` (`/login`) - Glassmorphism login form
+  - `Error` (`/error`) - Error page
+  - `NotFound` (`/not-found`) - 404 page
+- **Shared Components:** StatCard, DataTable, LoadingSpinner, ConfirmDialog, RedirectToLogin
+- **Services:** IApiService/ApiService (HTTP client), IAuthService/AuthService (client auth), AuthStateProvider
+- **Styling:** CSS variables, dark/light mode, glassmorphism, responsive design, RTL support
+
+### Database & Deployment
+- **Seed Data:** SuperAdmin, demo clinic, 2 doctors, receptionist, 5 patients, appointments, invoices, inventory
+- **Docker Compose:** API + Web + PostgreSQL 16 + Redis 7
+- **Dockerfiles:** Multi-stage builds for both API and Web
+- **.env.example:** All environment variables documented
+
+---
+
+## 3. CREDENTIALS
+
+| Role | Email | Password |
+|------|-------|----------|
+| SuperAdmin | admin@orthoflow.ai | Admin@123 |
+| Clinic Owner | owner@demo.com | Owner@123 |
+
+---
+
+## 4. HOW TO RUN
+
+### Prerequisites
+- .NET 10 SDK
+- PostgreSQL (local or Docker)
+- Redis (local or Docker)
+
+### Option A: Without Docker
+```bash
+cd C:\Users\mando\Desktop\TASK_4_Cli
+
+# Run the API (port 7200)
+dotnet run --project src\OrthoFlowAI.Api
+
+# In another terminal, run the Web (port 5000)
+dotnet run --project src\OrthoFlowAI.Web
+```
+
+### Option B: With Docker
+```bash
+docker-compose up -d
+```
+
+### Important Notes
+- The Web project calls the API via `HttpClient` (configured in Program.cs to `https://localhost:7200/`)
+- API needs PostgreSQL connection string in `appsettings.json`
+- Redis is optional (will degrade gracefully if not available)
+- EF Core auto-migrates on API startup
+- Seed data runs on first migration
+
+---
+
+## 5. WHAT'S REMAINING (TODO)
+
+### High Priority (Core Features)
+1. **Photo Management Module**
+   - Upload photos to local storage / cloud (S3)
+   - Photo gallery organized by month (Initial, Month 1, Month 2...)
+   - Before/After comparison slider (split view, overlay, zoom)
+   - Photo timeline view
+
+2. **Before/After Comparison UI**
+   - Interactive slider component
+   - Split mode / Overlay mode / Side by side
+   - Fullscreen comparison
+   - Timeline comparison
+
+3. **Treatment Timeline**
+   - Visual timeline component on patient profile
+   - Each visit displayed with details (wire, bracket, rubber bands, pain, notes)
+   - Photo attachments per visit
+
+4. **Payment System Enhancement**
+   - Installment management
+   - Stripe integration
+   - PDF invoice generation
+   - Receipt generation
+   - Refund handling
+
+5. **Document Management**
+   - File upload/download
+   - Consent forms with digital signature
+   - PDF export
+   - Cloud storage integration
+
+### Medium Priority (Communication & AI)
+6. **WhatsApp Integration**
+   - WhatsApp Business API integration
+   - Appointment reminders
+   - Invoice reminders
+   - Monthly reports
+   - Photo requests
+
+7. **SMS Integration**
+   - Fallback when WhatsApp unavailable
+
+8. **Push Notifications**
+   - Browser push notifications
+   - Mobile push (future)
+
+9. **AI Features Enhancement**
+   - AI Monthly Report Generator (treatment progress, improvement, recommendations)
+   - AI Treatment Summary
+   - AI Reminder Generator
+   - Image comparison scoring (percentage improvement)
+   - Journey Score calculation algorithm
+   - Compliance Score calculation
+   - Risk detection (delayed treatments)
+   - Voice-to-text doctor notes
+
+10. **Email Templates**
+    - Professional HTML email templates
+    - Appointment confirmations
+    - Treatment updates
+    - Welcome emails
+    - Reports
+
+### Medium Priority (Management)
+11. **Patient Portal**
+    - Separate login for patients
+    - View own appointments, photos, reports
+    - Pay invoices online
+    - Upload requested photos
+    - Pain tracking form
+    - Emergency button
+    - View educational content
+
+12. **Inventory Management UI**
+    - Inventory list with categories
+    - Low stock alerts
+    - Purchase history
+    - Supplier management
+
+13. **Staff Management UI**
+    - Staff list with roles
+    - Schedule management
+    - Attendance tracking
+    - Permission management
+
+14. **Branch Management UI**
+    - Branch list
+    - Per-branch data isolation
+    - Per-branch calendars and inventory
+
+15. **Analytics & Reports**
+    - Revenue charts (Recharts or MudBlazor Charts)
+    - Patient growth charts
+    - Treatment duration analytics
+    - No-show rate tracking
+    - Doctor performance metrics
+    - CSV/Excel/PDF export
+
+### Lower Priority (Polish & Extras)
+16. **MudBlazor Warnings Fix**
+    - Fix `Gutter` → proper MudBlazor attribute names
+    - Fix `RowHoverStyle`, `PanelClass`, `Active` attributes
+
+17. **Global Search**
+    - Search across patients, appointments, invoices, reports
+
+18. **Referral System UI**
+    - Referral code generation
+    - Rewards tracking
+    - Referral analytics
+
+19. **Patient Feedback UI**
+    - Post-visit survey
+    - Star rating component
+    - NPS scoring
+    - Reviews display
+
+20. **Education Center**
+    - Video library
+    - PDF articles
+    - FAQ section
+
+21. **Landing Page / Marketing Site**
+    - Hero section
+    - Features showcase
+    - Pricing plans
+    - Testimonials
+    - Contact form
+
+22. **Subscription/Billing System**
+    - Stripe billing integration
+    - Plan management UI
+    - Feature gating
+    - Coupon system
+
+23. **Super Admin Panel**
+    - Manage all clinics
+    - Revenue dashboard
+    - Support tickets
+    - Feature flags
+    - System logs
+
+24. **QR Code Check-in**
+    - Generate QR for each patient
+    - Check-in via scan
+
+25. **Multi-language (Arabic + English)**
+    - Resource files for localization
+    - RTL layout support (partial CSS done)
+
+26. **Offline Support**
+    - Service worker
+    - IndexedDB cache
+
+27. **Testing**
+    - Unit tests for services
+    - Integration tests for API
+    - Blazor component tests
+
+28. **CI/CD Pipeline**
+    - GitHub Actions workflow
+    - Automated testing
+    - Deployment to production
+
+---
+
+## 6. ARCHITECTURE DECISIONS & NOTES
+
+### Multi-Tenant Strategy
+- **Shared database** with `ClinicId` discriminator
+- EF Core Global Query Filter ensures clinic isolation
+- `TenantMiddleware` extracts `ClinicId` from JWT claims and sets it on DbContext
+- `SetClinicId()` method on DbContext for manual tenant context
+
+### Identity Architecture
+- Two user classes exist intentionally:
+  - `ApplicationUser` (Domain) - Plain entity for the domain model
+  - `ApplicationIdentityUser` (Infrastructure) - Inherits `IdentityUser`, used with ASP.NET Identity
+- This keeps the Domain layer clean from Identity concerns
+- `IdentityDbContext<ApplicationIdentityUser>` in Infrastructure
+
+### Authentication Flow
+- **API:** JWT Bearer tokens (stateless)
+- **Blazor Web:** Cookie authentication + calls API with JWT
+- `AuthStateProvider` in Blazor maps JWT claims to `ClaimsPrincipal`
+- Login flow: Web → POST /api/auth/login → get JWT → store in session → use for API calls
+
+### Service Registration Pattern
+- Each layer has its own `ServiceRegistration.cs` with extension methods:
+  - `services.AddApplication()` - AutoMapper, MediatR, FluentValidation
+  - `services.AddInfrastructure(config)` - DbContext, Identity, JWT, Redis, all services
+
+### Error Handling
+- Global `ExceptionHandlingMiddleware` catches all exceptions
+- Returns consistent `ApiResponse<T>` format with status codes
+- `TenantMiddleware` for multi-tenant context
+- `AuditMiddleware` for request logging
+
+---
+
+## 7. SUGGESTED NEXT STEPS (Priority Order)
+
+### Step 1: Get Database Working
+```bash
+# Install PostgreSQL locally or use Docker
+# Update connection string in src/OrthoFlowAI.Api/appsettings.json
+# Run the API - it auto-migrates and seeds data
+dotnet run --project src\OrthoFlowAI.Api
+```
+
+### Step 2: Connect Frontend to Backend
+```bash
+# Run both projects
+dotnet run --project src\OrthoFlowAI.Api    # Port 7200
+dotnet run --project src\OrthoFlowAI.Web    # Port 5000
+# Open http://localhost:5000
+# Login with admin@orthoflow.ai / Admin@123
+```
+
+### Step 3: Fix Remaining Build Warnings
+- Fix MudBlazor attribute warnings (Gutter, PanelClass, Active, RowHoverStyle)
+- Update MudBlazor API usage to match v8.x
+
+### Step 4: Build Photo Management
+- Upload service with local/cloud storage
+- Photo gallery component
+- Before/After comparison slider
+
+### Step 5: Build Patient Portal
+- Separate login flow for patients
+- Patient-facing dashboard
+- Pain tracker form
+- Emergency button
+
+### Step 6: AI Integration
+- Connect OpenAI API
+- Build report generation flow
+- Monthly report automation
+
+### Step 7: Communication
+- WhatsApp Business API integration
+- Email template engine
+- SMS fallback
+
+### Step 8: Polish & Deploy
+- Fix all warnings
+- Add tests
+- Set up CI/CD
+- Deploy to production
+
+---
+
+## 8. KNOWN ISSUES
+
+1. **MudBlazor Warnings:** Several attribute names don't match MudBlazor v8.x API (Gutter, PanelClass, Active, RowHoverStyle). These are warnings only, not errors.
+
+2. **SendGrid Package:** Using SendGrid 2.1.0 which has .NET Framework compatibility warnings. Consider upgrading to a newer version or using `SendGrid.Extensions.DependencyInjection`.
+
+3. **AutoMapper Version:** AutoMapper 14.0.0 has a known vulnerability (GHSA-rvv3-g6hj-g44x). Consider upgrading.
+
+4. **No EF Core Migrations Yet:** The API auto-migrates, but no migration files have been committed. Run `dotnet ef migrations add InitialCreate` to generate them.
+
+5. **Frontend API Connection:** The Blazor Web connects to API at `https://localhost:7200/` by default. Make sure both are running.
+
+6. **Seed Data Dependency:** The API auto-seeds on startup but requires a valid PostgreSQL connection first.
+
+---
+
+## 9. ENVIRONMENT VARIABLES
+
+See `.env.example` for the complete list. Key variables:
+
+| Variable | Description |
+|----------|-------------|
+| `ConnectionStrings__DefaultConnection` | PostgreSQL connection string |
+| `ConnectionStrings__Redis` | Redis connection string |
+| `JwtSettings__SecretKey` | JWT signing key (min 32 chars) |
+| `JwtSettings__Issuer` | JWT issuer |
+| `JwtSettings__Audience` | JWT audience |
+| `SendGridSettings__ApiKey` | SendGrid API key |
+| `SendGridSettings__FromEmail` | Sender email |
+| `OpenAISettings__ApiKey` | OpenAI API key |
+| `OpenAISettings__Model` | OpenAI model (gpt-4) |
+
+---
+
+## 10. FILE INVENTORY
+
+| Project | Files | Description |
+|---------|-------|-------------|
+| Domain | 24 | 21 entities, 1 enums, 2 interfaces, 1 common |
+| Application | 16 | 10 DTOs, 1 mapping, 4 validators, 1 service reg |
+| Infrastructure | 18 | DbContext, repos, services, identity, redis, seed |
+| Api | 14 | Controllers, middleware, hubs, Program.cs |
+| Web | 26 | Pages, layout, shared, services, auth, CSS |
+| Config | 7 | Docker, env, appsettings |
+| **Total** | **105+** | Production-quality code |
+
+---
+
+*Generated by AI Assistant - OrthoFlowAI Project*
+*Date: August 18, 2026*
+*Tech: .NET 10, ASP.NET Core, Blazor, EF Core, MudBlazor*

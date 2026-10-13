@@ -1,0 +1,40 @@
+services:
+  orthoflow-api:
+    build:
+      target: build
+    volumes:
+      - ./src:/src
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=OrthoFlowAI_Dev;Username=postgres;Password=postgres
+      - ConnectionStrings__Redis=redis:6379
+      - Jwt__SecretKey=OrthoFlowAI_DevSecretKey_2024_MustBe32Chars!!
+      - Jwt__Issuer=OrthoFlowAI
+      - Jwt__Audience=OrthoFlowAI
+    command: ["dotnet", "watch", "run", "--project", "/src/OrthoFlowAI.Api/OrthoFlowAI.Api.csproj", "--urls", "http://+:8080"]
+    ports:
+      - "5000:8080"
+
+  orthoflow-web:
+    build:
+      target: build
+    volumes:
+      - ./src:/src
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Api__BaseUrl=http://orthoflow-api:8080
+    command: ["dotnet", "watch", "run", "--project", "/src/OrthoFlowAI.Web/OrthoFlowAI.Web.csproj", "--urls", "http://+:8080"]
+    ports:
+      - "5001:8080"
+
+  postgres:
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=OrthoFlowAI_Dev
+
+  redis:
+    ports:
+      - "6379:6379"

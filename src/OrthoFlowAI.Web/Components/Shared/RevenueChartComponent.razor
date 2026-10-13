@@ -1,0 +1,26 @@
+@namespace OrthoFlowAI.Web.Components.Shared
+@using OrthoFlowAI.Infrastructure.Services
+
+@if (Data == null || Data.Count == 0)
+{
+    <div style="height:@Height;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);">
+        <MudText Typo="Typo.body2">No data available</MudText>
+    </div>
+}
+else
+{
+    <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="Series" XAxisLabels="Labels"
+              Width="100%" Height="@Height" />
+}
+
+@code {
+    [Parameter] public List<ChartPoint> Data { get; set; } = new();
+    [Parameter] public string Height { get; set; } = "280px";
+
+    private List<ChartSeries<double>> Series => new()
+    {
+        new ChartSeries<double> { Name = "Value", Data = Data.Select(d => (double)d.Value).ToArray() }
+    };
+
+    private string[] Labels => Data.Select(d => d.Label).ToArray();
+}

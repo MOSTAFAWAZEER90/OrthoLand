@@ -1,0 +1,147 @@
+@namespace OrthoFlowAI.Web.Components.Shared
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+            <MudIcon Icon="@Icons.Material.Filled.AddPhotoAlternate" Color="Color.Primary" Size="Size.Medium" />
+            <MudText Typo="Typo.h6" Style="font-weight:600;">Upload New Photo</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div style="border:2px dashed var(--border-color);border-radius:var(--radius-lg);padding:1rem;text-align:center;margin-bottom:1rem;">
+            @if (_previewUrl != null)
+            {
+                <img src="@_previewUrl" style="max-height:180px;max-width:100%;border-radius:var(--radius-md);object-fit:contain;" />
+                <MudText Typo="Typo.caption" Style="color:var(--text-secondary);margin-top:0.5rem;">@_fileName (@(Math.Max(1, _fileSize / 1024)) KB)</MudText>
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.AddPhotoAlternate" Size="Size.Large" Style="color:var(--text-tertiary);" />
+                <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);margin-top:0.5rem;">
+                    Select an image (JPG, PNG, WebP)
+                </MudText>
+            }
+            <div style="margin-top:0.75rem;">
+                <InputFile OnChange="OnFileSelected" accept="image/*" />
+            </div>
+        </div>
+
+        <MudSelect T="PhotoCategory" @bind-Value="_category" Label="Category" Variant="Variant.Outlined"
+                   Margin="Margin.Dense" FullWidth="true">
+            @foreach (var cat in Enum.GetValues<PhotoCategory>())
+            {
+                <MudSelectItem T="PhotoCategory" Value="cat">@cat</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudTextField @bind-Value="_description" Label="Description (optional)" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Style="margin-top:0.75rem;" FullWidth="true" />
+
+        <MudDatePicker @bind-Date="_visitDate" Label="Visit Date (optional)" Variant="Variant.Outlined"
+                       Margin="Margin.Dense" Style="margin-top:0.75rem;" DateFormat="yyyy-MM-dd" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined" Style="margin-right:0.5rem;">Cancel</MudButton>
+        <MudButton OnClick="Upload" Color="Color.Primary" Variant="Variant.Filled" Style="color:white;" Disabled="_uploading || _fileBytes == null">
+            @if (_uploading)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            }
+            else
+            {
+                @("Upload")
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public string PatientId { get; set; } = string.Empty;
+    [Parameter] public Action? OnUploaded { get; set; }
+
+    private byte[]? _fileBytes;
+    private string _fileName = "";
+    private long _fileSize;
+    private string? _previewUrl;
+    private PhotoCategory _category = PhotoCategory.Progress;
+    private string _description = "";
+    private DateTime? _visitDate = DateTime.Today;
+    private bool _uploading;
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        _fileSize = file.Size;
+        _fileName = file.Name;
+        using var ms = new MemoryStream();
+        await file.OpenReadStream(20 * 1024 * 1024).CopyToAsync(ms);
+        _fileBytes = ms.ToArray();
+        _previewUrl = $"data:{file.ContentType};base64,{Convert.ToBase64String(_fileBytes)}";
+        StateHasChanged();
+    }
+
+    private async Task Upload()
+    {
+        if (_fileBytes == null) return;
+        _uploading = true;
+        StateHasChanged();
+
+        try
+        {
+            var fields = new Dictionary<string, string>
+            {
+                ["PatientId"] = PatientId,
+                ["Category"] = ((int)_category).ToString(),
+                ["Description"] = _description
+            };
+            if (_visitDate.HasValue)
+            {
+                fields["VisitDate"] = _visitDate.Value.ToString("yyyy-MM-ddTHH:mm:ss");
+            }
+
+            var result = await ApiService.PostMultipartAsync<ApiResponse<PhotoResponse>>(
+                "api/photos", "file", _fileBytes, _fileName,
+                GetContentType(_fileName), fields);
+
+            if (result?.Success == true)
+            {
+                Snackbar.Add("Photo uploaded successfully", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+                OnUploaded?.Invoke();
+            }
+            else
+            {
+                Snackbar.Add("Failed to upload photo", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Upload error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _uploading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private static string GetContentType(string fileName)
+    {
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        return ext switch
+        {
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            ".gif" => "image/gif",
+            ".bmp" => "image/bmp",
+            _ => "image/jpeg"
+        };
+    }
+}

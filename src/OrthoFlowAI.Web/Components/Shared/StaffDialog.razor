@@ -1,0 +1,123 @@
+@namespace OrthoFlowAI.Web.Components.Shared
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+            <MudIcon Icon="@Icons.Material.Filled.Badge" Color="Color.Primary" Size="Size.Medium" />
+            <MudText Typo="Typo.h6" Style="font-weight:600;">@(IsEdit ? "Edit Staff" : "Add Staff")</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="Model.Position" Label="Position (e.g. Receptionist, Assistant)" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField @bind-Value="Model.Department" Label="Department" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudSelect T="StaffStatus" @bind-Value="Model.Status" Label="Status" Variant="Variant.Outlined" Margin="Margin.Dense">
+            @foreach (var s in Enum.GetValues<StaffStatus>())
+            {
+                <MudSelectItem T="StaffStatus" Value="s">@s</MudSelectItem>
+            }
+        </MudSelect>
+        <MudDatePicker @bind-Date="Model.HireDate" Label="Hire Date" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudNumericField @bind-Value="Model.Salary" Label="Salary" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
+        @if (!IsEdit)
+        {
+            <div style="background:var(--warning-light);color:var(--warning);padding:0.6rem;border-radius:var(--radius-md);margin-top:0.5rem;">
+                <MudText Typo="Typo.caption">
+                    Staff profiles are linked to existing clinic user accounts. Please ensure the user account exists before linking.
+                </MudText>
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined" Style="margin-right:0.5rem;">Cancel</MudButton>
+        <MudButton OnClick="Submit" Color="Color.Primary" Variant="Variant.Filled" Style="color:white;" Disabled="_saving">
+            @if (_saving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> } else { @(IsEdit ? "Update" : "Add") }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public bool IsEdit { get; set; }
+    [Parameter] public StaffResponse? Staff { get; set; }
+
+    private StaffModel Model { get; set; } = new();
+    private bool _saving;
+
+    protected override void OnInitialized()
+    {
+        if (IsEdit && Staff != null)
+        {
+            Model = new StaffModel
+            {
+                Position = Staff.Position,
+                Department = Staff.Department,
+                Status = Staff.Status,
+                HireDate = Staff.HireDate,
+                Salary = Staff.Salary
+            };
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        _saving = true;
+        StateHasChanged();
+
+        try
+        {
+            var update = new StaffUpdateDto
+            {
+                Position = Model.Position,
+                Department = Model.Department,
+                Status = Model.Status,
+                HireDate = Model.HireDate,
+                Salary = Model.Salary
+            };
+
+            var r = IsEdit && Staff != null
+                ? await ApiService.PutAsync<ApiResponse>($"api/staff/{Staff.Id}", update)
+                : await ApiService.PostAsync<ApiResponse>("api/staff", new StaffDto
+                {
+                    UserId = Model.UserId,
+                    Position = Model.Position,
+                    Department = Model.Department,
+                    Status = Model.Status,
+                    HireDate = Model.HireDate,
+                    Salary = Model.Salary
+                });
+
+            if (r?.Success == true)
+            {
+                Snackbar.Add("Staff saved", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add("Failed to save staff", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+            StateHasChanged();
+        }
+    }
+
+    protected class StaffModel
+    {
+        public string UserId { get; set; } = string.Empty;
+        public string? Position { get; set; }
+        public string? Department { get; set; }
+        public StaffStatus Status { get; set; } = StaffStatus.Active;
+        public DateTime? HireDate { get; set; }
+        public decimal? Salary { get; set; }
+    }
+}

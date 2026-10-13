@@ -1,0 +1,177 @@
+@page "/inventory"
+@rendermode InteractiveServer
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Inventory - OrthoFlowAI</PageTitle>
+
+<div class="page-header">
+    <div>
+        <MudText Typo="Typo.h4" Style="font-weight:800;">Inventory</MudText>
+        <MudText Typo="Typo.body2" Style="color:var(--text-secondary);margin-top:0.25rem;">
+            Track orthodontic supplies and materials
+        </MudText>
+    </div>
+    <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Filled" OnClick="OpenCreateDialog" Style="color:white;">
+        Add Item
+    </MudButton>
+</div>
+
+<MudCard Class="content-card">
+    <div class="card-header" style="flex-wrap:wrap;gap:0.75rem;">
+        <div style="display:flex;align-items:center;gap:0.75rem;flex:1;flex-wrap:wrap;">
+            <MudTextField @bind-Value="_searchTerm" Placeholder="Search items..."
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          IconSize="Size.Small" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Style="max-width:280px;min-width:200px;" Immediate="true" DebounceInterval="300"
+                          OnDebounceIntervalElapsed="LoadItems" />
+
+            <MudSelect T="InventoryCategory?" @bind-Value="_categoryFilter" Label="Category"
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" Style="min-width:150px;">
+                @foreach (var cat in Enum.GetValues<InventoryCategory>())
+                {
+                    <MudSelectItem T="InventoryCategory?" Value="cat">@cat</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudSwitch T="bool" @bind-Value="_lowStockOnly" Label="Low stock only" Color="Color.Error" />
+        </div>
+    </div>
+
+    <MudTable T="InventoryItem" Items="@_items" Hover="true" Dense="false"
+              Loading="@_loading" LoadingProgressColor="Color.Primary" FixedHeader="true"
+              Height="calc(100vh - 360px)">
+        <HeaderContent>
+            <MudTh Style="font-weight:600;">Item</MudTh>
+            <MudTh Style="font-weight:600;">Category</MudTh>
+            <MudTh Style="font-weight:600;">Brand</MudTh>
+            <MudTh Style="font-weight:600;">Price</MudTh>
+            <MudTh Style="font-weight:600;">In Stock</MudTh>
+            <MudTh Style="font-weight:600;">Status</MudTh>
+            <MudTh Style="font-weight:600;">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Item">
+                <MudText Typo="Typo.body2" Style="font-weight:600;">@context.Name</MudText>
+            </MudTd>
+            <MudTd DataLabel="Category">@context.Category</MudTd>
+            <MudTd DataLabel="Brand">@(context.Brand ?? "—")</MudTd>
+            <MudTd DataLabel="Price">$@context.UnitPrice.ToString("N2")</MudTd>
+            <MudTd DataLabel="In Stock">
+                <MudText Typo="Typo.body2" Style="font-weight:700;">@context.Quantity</MudText>
+            </MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Style="@GetStockStyle(context)">
+                    @(context.Quantity <= 0 ? "Out of Stock" : context.Quantity <= context.MinQuantity ? "Low" : "In Stock")
+                </MudChip>
+            </MudTd>
+            <MudTd DataLabel="Actions">
+                <MudIconButton Icon="@Icons.Material.Filled.AddCircleOutline" Size="Size.Small"
+                               Color="Color.Primary" OnClick="@(() => OpenRestock(context))" Title="Restock" />
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                               OnClick="@(() => OpenEditDialog(context))" Title="Edit" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                               OnClick="@(() => DeleteItem(context))" Title="Delete" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Typo="Typo.body2" Style="color:var(--text-tertiary);text-align:center;padding:2rem;">No inventory items found.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+</MudCard>
+
+@code {
+    private List<InventoryItem> _items = new();
+    private bool _loading = true;
+    private string _searchTerm = "";
+    private InventoryCategory? _categoryFilter;
+    private bool _lowStockOnly;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadItems();
+    }
+
+    private async Task LoadItems()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var query = $"api/inventory?pageNumber=1&pageSize=200&search={Uri.EscapeDataString(_searchTerm)}";
+            if (_categoryFilter.HasValue) query += $"&category={(int)_categoryFilter.Value}";
+            if (_lowStockOnly) query += "&lowStock=true";
+
+            var result = await ApiService.GetAsync<ApiResponse<PagedResult<InventoryItem>>>(query);
+            _items = result?.Data?.Items ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load inventory: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters<InventoryDialog>
+        {
+            { x => x.IsEdit, false }
+        };
+        var dialog = await DialogService.ShowAsync<InventoryDialog>("Add Inventory Item", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadItems();
+    }
+
+    private async Task OpenEditDialog(InventoryItem item)
+    {
+        var parameters = new DialogParameters<InventoryDialog>
+        {
+            { x => x.IsEdit, true },
+            { x => x.Item, item }
+        };
+        var dialog = await DialogService.ShowAsync<InventoryDialog>("Edit Inventory Item", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadItems();
+    }
+
+    private async Task OpenRestock(InventoryItem item)
+    {
+        var parameters = new DialogParameters<RestockDialog>
+        {
+            { x => x.Item, item }
+        };
+        var dialog = await DialogService.ShowAsync<RestockDialog>("Restock Item", parameters);
+        var result = await dialog.Result;
+        if (!result.Canceled) await LoadItems();
+    }
+
+    private async Task DeleteItem(InventoryItem item)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Title, "Delete Item" },
+            { x => x.Message, $"Delete {item.Name}?" },
+            { x => x.ConfirmText, "Delete" },
+            { x => x.OnConfirm, EventCallback.Factory.Create(this, async () =>
+            {
+                await ApiService.DeleteAsync<ApiResponse>($"api/inventory/{item.Id}");
+                await LoadItems();
+            })}
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        await DialogService.ShowAsync<ConfirmDialog>("Delete Confirmation", parameters, options);
+    }
+
+    private string GetStockStyle(InventoryItem item) => item.Quantity <= 0
+        ? "background:var(--danger-light);color:var(--danger);font-weight:600;"
+        : item.Quantity <= item.MinQuantity
+            ? "background:var(--warning-light);color:var(--warning);font-weight:600;"
+            : "background:var(--success-light);color:var(--success);font-weight:600;";
+}

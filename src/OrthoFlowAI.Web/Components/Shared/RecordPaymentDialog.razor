@@ -1,0 +1,109 @@
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+            <MudIcon Icon="@Icons.Material.Filled.Payment" Color="Color.Success" Size="Size.Medium" />
+            <MudText Typo="Typo.h6" Style="font-weight:600;">Record Payment</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12">
+                <MudText Typo="Typo.body2" Style="color:var(--text-secondary);">
+                    Invoice: <strong>@InvoiceNumber</strong> | Remaining: <strong style="color:var(--danger);">$@RemainingAmount.ToString("N2")</strong>
+                </MudText>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudNumericField @bind-Value="Model.Amount" Label="Amount" Required="true" Min="0.01m" Max="@RemainingAmount"
+                                 Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentText="$" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="PaymentMethod" @bind-Value="Model.PaymentMethod" Label="Payment Method" Required="true"
+                           Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem T="PaymentMethod" Value="PaymentMethod.Cash">Cash</MudSelectItem>
+                    <MudSelectItem T="PaymentMethod" Value="PaymentMethod.CreditCard">Credit Card</MudSelectItem>
+                    <MudSelectItem T="PaymentMethod" Value="PaymentMethod.BankTransfer">Bank Transfer</MudSelectItem>
+                    <MudSelectItem T="PaymentMethod" Value="PaymentMethod.Insurance">Insurance</MudSelectItem>
+                    <MudSelectItem T="PaymentMethod" Value="PaymentMethod.Online">Online</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="Model.TransactionId" Label="Transaction ID (optional)"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="Model.Notes" Label="Notes (optional)" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined" Style="margin-right:0.5rem;">Cancel</MudButton>
+        <MudButton OnClick="Submit" Color="Color.Success" Variant="Variant.Filled" Style="color:white;" Disabled="_saving">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            }
+            else
+            {
+                @("Record Payment")
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public string InvoiceId { get; set; } = string.Empty;
+    [Parameter] public string PatientId { get; set; } = string.Empty;
+    [Parameter] public string InvoiceNumber { get; set; } = string.Empty;
+    [Parameter] public decimal RemainingAmount { get; set; }
+
+    public CreatePaymentRequest Model { get; set; } = new();
+    private bool _saving;
+
+    protected override void OnInitialized()
+    {
+        Model.InvoiceId = InvoiceId;
+        Model.PatientId = PatientId;
+        Model.Amount = RemainingAmount;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        if (Model.Amount <= 0 || Model.Amount > RemainingAmount)
+        {
+            Snackbar.Add("Invalid payment amount", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await ApiService.PostAsync<object>($"api/invoices/{InvoiceId}/payments", Model);
+            if (result != null)
+            {
+                Snackbar.Add("Payment recorded successfully", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add("Failed to record payment", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+            StateHasChanged();
+        }
+    }
+}

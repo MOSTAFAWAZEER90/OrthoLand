@@ -1,0 +1,280 @@
+@page "/"
+@rendermode InteractiveServer
+@attribute [AllowAnonymous]
+@inject NavigationManager Navigation
+@using OrthoFlowAI.Web.Models
+
+<PageTitle>OrthoFlow AI - AI-Powered Orthodontic Practice Management</PageTitle>
+
+<!-- Hero Section -->
+<section class="hero-section" style="position:relative;min-height:100vh;display:flex;align-items:center;background:linear-gradient(135deg,var(--bg-primary) 0%,var(--bg-secondary) 100%);overflow:hidden;">
+    <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at center,rgba(99,102,241,0.05) 0%,transparent 70%);"></div>
+    
+    <div class="container" style="max-width:1200px;margin:0 auto;padding:2rem 1.5rem;position:relative;z-index:1;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:3rem;align-items:center;min-height:calc(100vh - 4rem);">
+            <!-- Left Content -->
+            <div>
+                <div style="display:inline-block;padding:0.5rem 1rem;background:rgba(99,102,241,0.1);border-radius:9999px;margin-bottom:1.5rem;border:1px solid rgba(99,102,241,0.2);">
+                    <MudText Typo="Typo.caption" Style="color:var(--primary);font-weight:600;">New: AI Treatment Reports & Patient Portal</MudText>
+                </div>
+                
+                <h1 style="font-size:clamp(2.5rem,5vw,4rem);font-weight:800;line-height:1.1;margin-bottom:1.5rem;color:var(--text-primary);">
+                    Transform Your Orthodontic Practice with <span style="background:linear-gradient(135deg,var(--primary),var(--secondary));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">AI-Powered Intelligence</span>
+                </h1>
+                
+                <p style="font-size:1.25rem;color:var(--text-secondary);line-height:1.7;margin-bottom:2rem;max-width:500px;">
+                    The complete SaaS platform for orthodontic clinics. Manage patients, appointments, treatments, payments, and AI-generated reports - all in one beautiful, modern interface.
+                </p>
+                
+                <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:3rem;">
+                    <MudButton Variant="Variant.Filled" Size="Size.Large" Style="background:var(--accent-gradient);color:white;padding:1rem 2rem;font-weight:600;font-size:1.1rem;border-radius:12px;" 
+                              OnClick="@(() => Navigation.NavigateTo("/login"))">
+                        <MudIcon Icon="@Icons.Material.Filled.RocketLaunch" Size="Size.Medium" Style="margin-right:0.5rem;" />
+                        Start Free Trial
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Size="Size.Large" Style="border-color:var(--primary);color:var(--primary);padding:1rem 2rem;font-weight:600;font-size:1.1rem;border-radius:12px;"
+                              OnClick="@(() => Navigation.NavigateTo("/login"))">
+                        <MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Medium" Style="margin-right:0.5rem;" />
+                        Watch Demo
+                    </MudButton>
+                </div>
+                
+                <!-- Trust Indicators -->
+                <div style="display:flex;gap:2rem;flex-wrap:wrap;">
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <MudIcon Icon="@Icons.Material.Filled.Shield" Size="Size.Medium" Style="color:var(--success);" />
+                        <MudText Typo="Typo.body2" Style="color:var(--text-secondary);">HIPAA Compliant</MudText>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <MudIcon Icon="@Icons.Material.Filled.Cloud" Size="Size.Medium" Style="color:var(--info);" />
+                        <MudText Typo="Typo.body2" Style="color:var(--text-secondary);">Cloud Native</MudText>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <MudIcon Icon="@Icons.Material.Filled.Language" Size="Size.Medium" Style="color:var(--warning);" />
+                        <MudText Typo="Typo.body2" Style="color:var(--text-secondary);">Arabic & English</MudText>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right: Dashboard Preview -->
+            <div style="position:relative;">
+                <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:16px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);overflow:hidden;">
+                    <div style="background:rgba(99,102,241,0.05);border-bottom:1px solid var(--border-color);padding:1rem 1.5rem;display:flex;align-items:center;gap:0.75rem;">
+                        <div style="width:12px;height:12px;border-radius:50%;background:#ef4444;"></div>
+                        <div style="width:12px;height:12px;border-radius:50%;background:#f59e0b;"></div>
+                        <div style="width:12px;height:12px;border-radius:50%;background:#22c55e;"></div>
+                        <div style="flex:1;text-align:center;font-family:monospace;font-size:0.875rem;color:var(--text-tertiary);">orthoflowai.app</div>
+                    </div>
+                    <div style="padding:1.5rem;">
+                        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem;">
+                            <div style="background:var(--bg-tertiary);border-radius:12px;padding:1rem;text-align:center;">
+                                <MudText Typo="Typo.h4" Style="font-weight:700;color:var(--primary);">247</MudText>
+                                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Active Patients</MudText>
+                            </div>
+                            <div style="background:var(--bg-tertiary);border-radius:12px;padding:1rem;text-align:center;">
+                                <MudText Typo="Typo.h4" Style="font-weight:700;color:var(--success);">$12.4K</MudText>
+                                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Monthly Revenue</MudText>
+                            </div>
+                            <div style="background:var(--bg-tertiary);border-radius:12px;padding:1rem;text-align:center;">
+                                <MudText Typo="Typo.h4" Style="font-weight:700;color:var(--info);">18</MudText>
+                                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Today's Appointments</MudText>
+                            </div>
+                            <div style="background:var(--bg-tertiary);border-radius:12px;padding:1rem;text-align:center;">
+                                <MudText Typo="Typo.h4" Style="font-weight:700;color:var(--warning);">94%</MudText>
+                                <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Treatment Compliance</MudText>
+                            </div>
+                        </div>
+                        <div style="background:var(--bg-tertiary);border-radius:12px;padding:1rem;height:200px;display:flex;align-items:end;justify-content:space-between;gap:0.5rem;">
+                            @for (int i = 0; i < 12; i++) {
+                                var height = 30 + (i * 8) % 100;
+                                <div style="flex:1;background:linear-gradient(to top,var(--primary),var(--secondary));border-radius:4px 4px 0 0;min-height:@(height)px;transition:height 0.3s;"></div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Scroll Indicator -->
+    <div style="position:absolute;bottom:2rem;left:50%;transform:translateX(-50%);animation:bounce 2s infinite;">
+        <MudIcon Icon="@Icons.Material.Filled.KeyboardArrowDown" Size="Size.Large" Style="color:var(--text-tertiary);" />
+    </div>
+</section>
+
+<!-- Features Section -->
+<section style="padding:5rem 1.5rem;background:var(--bg-primary);">
+    <div class="container" style="max-width:1200px;margin:0 auto;">
+        <div style="text-align:center;margin-bottom:4rem;">
+            <MudText Typo="Typo.caption" Style="color:var(--primary);font-weight:600;text-transform:uppercase;letter-spacing:0.1em;">Features</MudText>
+            <h2 style="font-size:clamp(2rem,4vw,3rem);font-weight:800;margin:1rem 0;color:var(--text-primary);">
+                Everything You Need to Run a Modern Orthodontic Practice
+            </h2>
+            <p style="font-size:1.125rem;color:var(--text-secondary);max-width:600px;margin:0 auto;">
+                From patient management to AI-powered insights, OrthoFlow AI handles every aspect of your clinic operations.
+            </p>
+        </div>
+        
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(350px,1fr));gap:1.5rem;">
+            @foreach (var feature in Features)
+            {
+                <FeatureCard Feature="feature" />
+            }
+        </div>
+    </div>
+</section>
+
+<!-- Pricing Section -->
+<section style="padding:5rem 1.5rem;background:var(--bg-secondary);">
+    <div class="container" style="max-width:1200px;margin:0 auto;">
+        <div style="text-align:center;margin-bottom:4rem;">
+            <MudText Typo="Typo.caption" Style="color:var(--primary);font-weight:600;text-transform:uppercase;letter-spacing:0.1em;">Pricing</MudText>
+            <h2 style="font-size:clamp(2rem,4vw,3rem);font-weight:800;margin:1rem 0;color:var(--text-primary);">
+                Simple, Transparent Pricing for Every Practice Size
+            </h2>
+            <p style="font-size:1.125rem;color:var(--text-secondary);max-width:600px;margin:0 auto;">
+                Choose the plan that fits your practice. All plans include a 14-day free trial. No credit card required.
+            </p>
+        </div>
+        
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.5rem;align-items:start;">
+            @foreach (var plan in PricingPlans)
+            {
+                <PricingCard Plan="plan" />
+            }
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section style="padding:5rem 1.5rem;background:linear-gradient(135deg,var(--primary) 0%,var(--secondary) 100%);">
+    <div class="container" style="max-width:800px;margin:0 auto;text-align:center;">
+        <h2 style="font-size:clamp(2rem,4vw,3rem);font-weight:800;color:white;margin-bottom:1rem;">
+            Ready to Transform Your Practice?
+        </h2>
+        <p style="font-size:1.25rem;color:rgba(255,255,255,0.9);margin-bottom:2rem;line-height:1.6;">
+            Join hundreds of orthodontic practices already using OrthoFlow AI. Start your 14-day free trial today.
+        </p>
+        <MudButton Variant="Variant.Filled" Size="Size.Large" Style="background:white;color:var(--primary);padding:1rem 2.5rem;font-weight:600;font-size:1.1rem;border-radius:12px;"
+                  OnClick="@(() => Navigation.NavigateTo("/login"))">
+            <MudIcon Icon="@Icons.Material.Filled.RocketLaunch" Size="Size.Medium" Style="margin-right:0.5rem;" />
+            Start Free Trial
+        </MudButton>
+        <MudText Typo="Typo.caption" Style="color:rgba(255,255,255,0.7);display:block;margin-top:1rem;">
+            No credit card required · Cancel anytime · 14-day free trial
+        </MudText>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer style="background:var(--bg-primary);border-top:1px solid var(--border-color);padding:3rem 1.5rem;">
+    <div class="container" style="max-width:1200px;margin:0 auto;">
+        <div style="display:grid;grid-template-columns:2fr repeat(3,1fr);gap:2rem;">
+            <div>
+                <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
+                    <div style="width:40px;height:40px;border-radius:10px;background:var(--accent-gradient);display:flex;align-items:center;justify-content:center;">
+                        <MudIcon Icon="Icons.Material.Filled.Paragliding" Size="Size.Medium" Style="color:white;" />
+                    </div>
+                    <MudText Style="color:white;font-weight:700;font-size:1.25rem;">OrthoFlowAI</MudText>
+                </div>
+                <MudText Typo="Typo.body2" Style="color:rgba(255,255,255,0.7);line-height:1.7;max-width:300px;">
+                    The AI-powered orthodontic practice management platform that helps you deliver exceptional patient care while growing your practice.
+                </MudText>
+            </div>
+            
+            <div>
+                <MudText Typo="Typo.subtitle1" Style="color:white;font-weight:600;margin-bottom:1rem;">Product</MudText>
+                <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                    @foreach (var link in FooterLinks["Product"])
+                    {
+                        <MudLink Href="#" Style="color:rgba(255,255,255,0.7);font-size:0.9375rem;">@link</MudLink>
+                    }
+                </div>
+            </div>
+            
+            <div>
+                <MudText Typo="Typo.subtitle1" Style="color:white;font-weight:600;margin-bottom:1rem;">Company</MudText>
+                <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                    @foreach (var link in FooterLinks["Company"])
+                    {
+                        <MudLink Href="#" Style="color:rgba(255,255,255,0.7);font-size:0.9375rem;">@link</MudLink>
+                    }
+                </div>
+            </div>
+            
+            <div>
+                <MudText Typo="Typo.subtitle1" Style="color:white;font-weight:600;margin-bottom:1rem;">Resources</MudText>
+                <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                    @foreach (var link in FooterLinks["Resources"])
+                    {
+                        <MudLink Href="#" Style="color:rgba(255,255,255,0.7);font-size:0.9375rem;">@link</MudLink>
+                    }
+                </div>
+            </div>
+        </div>
+        
+        <div style="margin-top:3rem;padding-top:2rem;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+            <MudText Typo="Typo.caption" Style="color:rgba(255,255,255,0.5);">
+                © 2024 OrthoFlow AI. All rights reserved.
+            </MudText>
+            <div style="display:flex;gap:1.5rem;">
+                <MudLink Href="#" Style="color:rgba(255,255,255,0.5);">Privacy Policy</MudLink>
+                <MudLink Href="#" Style="color:rgba(255,255,255,0.5);">Terms of Service</MudLink>
+                <MudLink Href="#" Style="color:rgba(255,255,255,0.5);">Cookie Policy</MudLink>
+            </div>
+        </div>
+    </div>
+</footer>
+
+@code {
+    private FeatureItem[] Features = new[]
+    {
+        new FeatureItem("Icons.Material.Filled.People", "Patient Management", "Complete patient profiles with medical history, treatment plans, progress photos, and automated communication.", "primary"),
+        new FeatureItem("Icons.Material.Filled.CalendarMonth", "Smart Scheduling", "Drag-and-drop calendar with recurring appointments, waitlist management, and automated reminders via WhatsApp, SMS, and Email.", "info"),
+        new FeatureItem("Icons.Material.Filled.AutoAwesome", "AI Treatment Reports", "Monthly AI-generated treatment progress reports with before/after comparisons, compliance tracking, and personalized recommendations.", "warning"),
+        new FeatureItem("Icons.Material.Filled.AttachMoney", "Payments & Invoicing", "Flexible payment plans, automated invoicing, Stripe integration, and real-time financial analytics.", "success"),
+        new FeatureItem("Icons.Material.Filled.AccountCircle", "Patient Portal", "Secure patient access to appointments, photos, reports, invoices, pain tracking, and direct messaging with the clinic.", "secondary"),
+        new FeatureItem("Icons.Material.Filled.Insights", "Advanced Analytics", "Revenue tracking, patient growth, treatment duration analysis, no-show rates, and doctor performance dashboards.", "tertiary"),
+        new FeatureItem("Icons.Material.Filled.MedicalServices", "Treatment Timeline", "Complete visit history with wire changes, bracket replacements, pain levels, medications, and next appointment scheduling.", "primary"),
+        new FeatureItem("Icons.Material.Filled.EmergencyShare", "Emergency Management", "Patient emergency requests with photo/video upload, instant doctor notifications, and priority handling.", "danger"),
+        new FeatureItem("Icons.Material.Filled.Inventory2", "Inventory Management", "Track brackets, wires, elastics, adhesives with low-stock alerts, supplier management, and purchase history.", "info")
+    };
+
+    private PricingPlan[] PricingPlans = new[]
+    {
+        new PricingPlan(
+            "Starter",
+            "Perfect for small clinics getting started",
+            99, 990,
+            300, 2, 1,
+            new[] { "Up to 300 patients", "Appointment reminders (Email/SMS)", "Basic photo management", "Patient portal", "Treatment timeline", "Basic analytics", "2 staff accounts", "1 branch" },
+            false,
+            "price_starter_monthly", "price_starter_yearly"
+        ),
+        new PricingPlan(
+            "Professional",
+            "For growing practices with advanced needs",
+            299, 2990,
+            -1, 10, 5,
+            new[] { "Unlimited patients", "WhatsApp integration", "AI-powered reports", "Advanced analytics & insights", "Inventory management", "Document management with e-signatures", "Referral tracking", "Patient feedback/NPS", "Multi-language support", "10 staff accounts", "5 branches" },
+            true,
+            "price_professional_monthly", "price_professional_yearly"
+        ),
+        new PricingPlan(
+            "Enterprise",
+            "For large clinic chains and organizations",
+            999, 9990,
+            -1, -1, -1,
+            new[] { "Unlimited everything", "Custom branding & white-label", "API access", "Dedicated support & SLA", "Custom integrations", "White-label mobile app", "Advanced security & compliance", "Custom reporting", "SSO & 2FA", "Unlimited staff", "Unlimited branches" },
+            false,
+            "price_enterprise_monthly", "price_enterprise_yearly"
+        )
+    };
+
+    private Dictionary<string, string[]> FooterLinks = new()
+    {
+        ["Product"] = new[] { "Features", "Pricing", "Integrations", "API Docs", "Changelog", "Roadmap" },
+        ["Company"] = new[] { "About Us", "Careers", "Blog", "Press", "Contact", "Partners" },
+        ["Resources"] = new[] { "Help Center", "Community", "Webinars", "Case Studies", "Security", "Compliance" }
+    };
+}

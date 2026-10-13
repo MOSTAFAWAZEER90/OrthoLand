@@ -1,0 +1,18 @@
+﻿@page "/error"
+@layout LoginLayout
+@using System.Diagnostics
+
+<PageTitle>Error - OrthoFlowAI</PageTitle>
+
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg-primary);">
+    <div style="text-align:center;padding:2rem;max-width:600px;">
+        <MudIcon Icon="@Icons.Material.Filled.Error" Size="Size.Large" Style="color:var(--danger);font-size:4rem;" />
+        <MudText Typo="Typo.h4" Style="font-weight:700;margin-top:1rem;">Something went wrong</MudText>
+        <MudText Typo="Typo.body1" Style="color:var(--text-secondary);margin-top:0.5rem;">
+            An unexpected error occurred. Please try again.
+        </MudText>
+        <MudButton Href="/" Variant="Variant.Filled" Style="margin-top:1.5rem;color:white;">
+            Go to Dashboard
+        </MudButton>
+    </div>
+</div>

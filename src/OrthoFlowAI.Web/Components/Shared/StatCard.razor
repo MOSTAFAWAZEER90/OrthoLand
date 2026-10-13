@@ -1,0 +1,27 @@
+<MudCard Class="@($"stat-card {Color}")">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;">
+        <div>
+            <div class="stat-value">@Value</div>
+            <div class="stat-label">@Label</div>
+            @if (!string.IsNullOrEmpty(Trend))
+            {
+                <div class="stat-trend @(TrendUp ? "up" : "down")">
+                    <MudIcon Icon="@(TrendUp ? Icons.Material.Filled.TrendingUp : Icons.Material.Filled.TrendingDown)" Size="Size.Small" />
+                    @Trend
+                </div>
+            }
+        </div>
+        <div class="stat-icon">
+            <MudIcon Icon="@Icon" Size="Size.Large" />
+        </div>
+    </div>
+</MudCard>
+
+@code {
+    [Parameter] public string Icon { get; set; } = Icons.Material.Filled.Analytics;
+    [Parameter] public string Value { get; set; } = "0";
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string Color { get; set; } = "primary";
+    [Parameter] public string? Trend { get; set; }
+    [Parameter] public bool TrendUp { get; set; } = true;
+}

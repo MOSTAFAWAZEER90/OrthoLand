@@ -1,0 +1,25 @@
+﻿<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+            <NotAuthorized>
+                @if (context.User.Identity?.IsAuthenticated != true)
+                {
+                    <RedirectToLogin />
+                }
+                else
+                {
+                    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
+                        <div style="text-align:center;">
+                            <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Large" Style="color:var(--text-tertiary);font-size:3rem;" />
+                            <MudText Typo="Typo.h5" Style="font-weight:600;margin-top:1rem;">Access Denied</MudText>
+                            <MudText Typo="Typo.body2" Style="color:var(--text-secondary);margin-top:0.5rem;">
+                                You don't have permission to access this page.
+                            </MudText>
+                        </div>
+                    </div>
+                }
+            </NotAuthorized>
+        </AuthorizeRouteView>
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+</Router>

@@ -1,0 +1,146 @@
+@using OrthoFlowAI.Web.Services
+@using OrthoFlowAI.Application.DTOs
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Style="font-weight:600;margin-bottom:1.5rem;">
+            @(_editing ? "Edit Treatment Visit" : "Add Treatment Visit")
+        </MudText>
+
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudDatePicker @bind-Value="_visit.VisitDate" Label="Visit Date" Variant="Variant.Outlined" FullWidth="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect T="PainLevel" @bind-Value="_visit.PainLevel" Label="Pain Level" Variant="Variant.Outlined" FullWidth="true">
+                    <MudSelectItem T="PainLevel" Value="PainLevel.None">None</MudSelectItem>
+                    <MudSelectItem T="PainLevel" Value="PainLevel.Minimal">Minimal</MudSelectItem>
+                    <MudSelectItem T="PainLevel" Value="PainLevel.Mild">Mild</MudSelectItem>
+                    <MudSelectItem T="PainLevel" Value="PainLevel.Moderate">Moderate</MudSelectItem>
+                    <MudSelectItem T="PainLevel" Value="PainLevel.Severe">Severe</MudSelectItem>
+                    <MudSelectItem T="PainLevel" Value="PainLevel.VerySevere">Very Severe</MudSelectItem>
+                    <MudSelectItem T="PainLevel" Value="PainLevel.Extreme">Extreme</MudSelectItem>
+                    <MudSelectItem T="PainLevel" Value="PainLevel.VeryExtreme">Very Extreme</MudSelectItem>
+                    <MudSelectItem T="PainLevel" Value="PainLevel.Unbearable">Unbearable</MudSelectItem>
+                    <MudSelectItem T="PainLevel" Value="PainLevel.Worst">Worst</MudSelectItem>
+                    <MudSelectItem T="PainLevel" Value="PainLevel.WorstPossible">Worst Possible</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid Style="margin-top:1rem;">
+            <MudItem xs="12" md="4">
+                <MudCheckBox T="bool" @bind-Value="_visit.WireChanged" Label="Wire Changed" Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudCheckBox T="bool" @bind-Value="_visit.BracketReplaced" Label="Bracket Replaced" Color="Color.Secondary" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudCheckBox T="bool" @bind-Value="_visit.RubberBandsUsed" Label="Rubber Bands Used" Color="Color.Success" />
+            </MudItem>
+        </MudGrid>
+
+        <MudTextField @bind-Value="_visit.Medication" Label="Medication (if any)" Variant="Variant.Outlined" FullWidth="true" Margin="Margin.Dense" Style="margin-top:1rem;" />
+
+        <MudTextField @bind-Value="_visit.DoctorNotes" Label="Doctor Notes" Variant="Variant.Outlined" FullWidth="true" Margin="Margin.Dense" Lines="4" Style="margin-top:1rem;" />
+
+        <MudDatePicker @bind-Value="_visit.NextAppointmentDate" Label="Next Appointment Date (optional)" Variant="Variant.Outlined" FullWidth="true" Style="margin-top:1rem;" />
+
+        <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);margin-top:1rem;">
+            Attach photos to this visit from the Photos tab after saving.
+        </MudText>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" OnClick="Save" Disabled="_saving">
+            @if (_saving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Inherit" /> } else { @(_editing ? "Update" : "Create") }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public string PatientId { get; set; } = "";
+    [Parameter] public TreatmentVisitResponse? ExistingVisit { get; set; }
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private bool _editing => ExistingVisit != null;
+    private bool _saving;
+    private CreateTreatmentVisitRequest _visit = new();
+
+    protected override void OnInitialized()
+    {
+        if (ExistingVisit != null)
+        {
+            _visit = new CreateTreatmentVisitRequest
+            {
+                PatientId = PatientId,
+                DoctorId = ExistingVisit.DoctorId,
+                VisitDate = ExistingVisit.VisitDate,
+                WireChanged = ExistingVisit.WireChanged,
+                BracketReplaced = ExistingVisit.BracketReplaced,
+                RubberBandsUsed = ExistingVisit.RubberBandsUsed,
+                PainLevel = ExistingVisit.PainLevel,
+                DoctorNotes = ExistingVisit.DoctorNotes,
+                Medication = ExistingVisit.Medication,
+                NextAppointmentDate = ExistingVisit.NextAppointmentDate
+            };
+        }
+        else
+        {
+            _visit = new CreateTreatmentVisitRequest
+            {
+                PatientId = PatientId,
+                DoctorId = "",
+                VisitDate = DateTime.Today,
+                PainLevel = PainLevel.None
+            };
+        }
+    }
+
+    private async Task Save()
+    {
+        _saving = true;
+        StateHasChanged();
+
+        try
+        {
+            ApiResponse<TreatmentVisitResponse>? result;
+            if (_editing && !string.IsNullOrEmpty(ExistingVisit?.Id))
+            {
+                result = await ApiService.PutAsync<ApiResponse<TreatmentVisitResponse>>($"api/treatment-visits/{ExistingVisit.Id}", _visit);
+            }
+            else
+            {
+                result = await ApiService.PostAsync<ApiResponse<TreatmentVisitResponse>>("api/treatment-visits", _visit);
+            }
+
+            if (result?.Success == true)
+            {
+                Snackbar.Add(_editing ? "Visit updated" : "Visit created", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add(result?.Message ?? "Failed to save visit", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+}

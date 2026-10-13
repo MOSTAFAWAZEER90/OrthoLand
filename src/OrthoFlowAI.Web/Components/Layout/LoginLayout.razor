@@ -1,0 +1,41 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="_theme" />
+<MudPopoverProvider />
+
+<div style="min-height:100vh;background:var(--bg-primary);">
+    @Body
+</div>
+
+@code {
+    private MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight()
+        {
+            Primary = "#6366f1",
+            Secondary = "#8b5cf6",
+            Background = "#fafafa",
+            Surface = "#ffffff",
+            TextPrimary = "#111827",
+            TextSecondary = "#6b7280",
+            Divider = "#e5e7eb"
+        },
+        PaletteDark = new PaletteDark()
+        {
+            Primary = "#818cf8",
+            Secondary = "#a78bfa",
+            Background = "#0f0f1a",
+            Surface = "#1a1a2e",
+            TextPrimary = "#f1f5f9",
+            TextSecondary = "#94a3b8",
+            Divider = "rgba(255,255,255,0.08)"
+        },
+        Typography = new Typography()
+        {
+            Default = new DefaultTypography()
+            {
+                FontFamily = new[] { "Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif" }
+            }
+        }
+    };
+}

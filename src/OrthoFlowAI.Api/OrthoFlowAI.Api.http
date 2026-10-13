@@ -1,0 +1,6 @@
+@OrthoFlowAI.Api_HostAddress = http://localhost:5234
+
+GET {{OrthoFlowAI.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

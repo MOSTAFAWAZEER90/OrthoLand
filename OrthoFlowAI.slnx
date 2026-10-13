@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/OrthoFlowAI.Api/OrthoFlowAI.Api.csproj" />
+    <Project Path="src/OrthoFlowAI.Application/OrthoFlowAI.Application.csproj" />
+    <Project Path="src/OrthoFlowAI.Domain/OrthoFlowAI.Domain.csproj" />
+    <Project Path="src/OrthoFlowAI.Infrastructure/OrthoFlowAI.Infrastructure.csproj" />
+    <Project Path="src/OrthoFlowAI.Web/OrthoFlowAI.Web.csproj" />
+  </Folder>
+</Solution>

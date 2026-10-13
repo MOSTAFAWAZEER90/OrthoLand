@@ -1,0 +1,91 @@
+@namespace OrthoFlowAI.Web.Components.Shared
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+            <MudIcon Icon="@Icons.Material.Filled.Storefront" Color="Color.Primary" Size="Size.Medium" />
+            <MudText Typo="Typo.h6" Style="font-weight:600;">@(IsEdit ? "Edit Branch" : "Add Branch")</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="Model.Name" Label="Name" Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField @bind-Value="Model.Address" Label="Address" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField @bind-Value="Model.Phone" Label="Phone" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField @bind-Value="Model.Email" Label="Email" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudTextField @bind-Value="Model.OperatingHours" Label="Operating Hours (e.g. Mon-Fri 9-5)" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        <MudSwitch T="bool" @bind-Value="Model.IsMainBranch" Label="Main branch" Color="Color.Primary" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Outlined" Style="margin-right:0.5rem;">Cancel</MudButton>
+        <MudButton OnClick="Submit" Color="Color.Primary" Variant="Variant.Filled" Style="color:white;" Disabled="_saving">
+            @if (_saving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" /> } else { @(IsEdit ? "Update" : "Add") }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public bool IsEdit { get; set; }
+    [Parameter] public Branch? Branch { get; set; }
+
+    private BranchDto Model { get; set; } = new();
+    private bool _saving;
+
+    protected override void OnInitialized()
+    {
+        if (IsEdit && Branch != null)
+        {
+            Model = new BranchDto
+            {
+                Name = Branch.Name,
+                Address = Branch.Address,
+                Phone = Branch.Phone,
+                Email = Branch.Email,
+                IsMainBranch = Branch.IsMainBranch,
+                OperatingHours = Branch.OperatingHours
+            };
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(Model.Name))
+        {
+            Snackbar.Add("Name is required", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        StateHasChanged();
+
+        try
+        {
+            ApiResponse? r = IsEdit && Branch != null
+                ? await ApiService.PutAsync<ApiResponse>($"api/branches/{Branch.Id}", Model)
+                : await ApiService.PostAsync<ApiResponse>("api/branches", Model);
+
+            if (r?.Success == true)
+            {
+                Snackbar.Add(IsEdit ? "Branch updated" : "Branch added", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                Snackbar.Add("Failed to save branch", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+            StateHasChanged();
+        }
+    }
+}

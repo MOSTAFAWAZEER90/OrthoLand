@@ -1,0 +1,230 @@
+@page "/login"
+@layout LoginLayout
+@inject IAuthService AuthService
+@inject AuthStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@rendermode InteractiveServer
+
+<PageTitle>Login - OrthoFlowAI</PageTitle>
+
+<div class="login-page">
+    <div class="login-bg">
+        <div class="login-shape login-shape-1"></div>
+        <div class="login-shape login-shape-2"></div>
+        <div class="login-shape login-shape-3"></div>
+    </div>
+
+    <div class="login-container fade-in">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="login-logo">
+                    <MudIcon Icon="@Icons.Material.Filled.Paragliding" Size="Size.Large" Style="color:white;" />
+                </div>
+                <MudText Typo="Typo.h4" Style="font-weight:800;color:var(--text-primary);">OrthoFlowAI</MudText>
+                <MudText Typo="Typo.body2" Style="color:var(--text-secondary);margin-top:0.5rem;">
+                    Sign in to your dental practice
+                </MudText>
+            </div>
+
+            <EditForm Model="_model" OnValidSubmit="HandleLogin" FormName="LoginForm">
+                <div style="display:flex;flex-direction:column;gap:1.25rem;">
+                    <MudTextField @bind-Value="_model.Email"
+                                  Label="Email address"
+                                  Placeholder="doctor@clinic.com"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Email"
+                                  IconSize="Size.Small"
+                                  Variant="Variant.Outlined"
+                                  FullWidth="true"
+                                  InputType="InputType.Email"
+                                  Required="true"
+                                  Class="login-field" />
+
+                    <MudTextField @bind-Value="_model.Password"
+                                  Label="Password"
+                                  Placeholder="Enter your password"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Lock"
+                                  IconSize="Size.Small"
+                                  Variant="Variant.Outlined"
+                                  FullWidth="true"
+                                  InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                                  Required="true"
+                                  Class="login-field" />
+
+                    <div style="position:relative;margin-top:-0.75rem;">
+                        <MudButton OnClick="@(() => _showPassword = !_showPassword)"
+                                   StartIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                   Size="Size.Small" Variant="Variant.Text"
+                                   Style="color:var(--text-tertiary);text-transform:none;font-size:0.75rem;">
+                            @(_showPassword ? "Hide" : "Show") password
+                        </MudButton>
+                    </div>
+
+                    <div style="display:flex;align-items:center;justify-content:space-between;">
+                        <MudCheckBox @bind-Value="_model.RememberMe"
+                                     Label="Remember me"
+                                     Color="Color.Primary"
+                                     Style="font-size:0.875rem;" />
+                        <MudLink Href="/forgot-password" Style="font-size:0.875rem;font-weight:500;">Forgot password?</MudLink>
+                    </div>
+
+                    <MudButton ButtonType="ButtonType.Submit"
+                               Variant="Variant.Filled"
+                               FullWidth="true"
+                               Size="Size.Large"
+                               Disabled="_isLoading"
+                               Style="background:var(--accent-gradient);color:white;font-weight:700;border-radius:var(--radius-md);text-transform:none;padding:0.75rem;font-size:1rem;">
+                        @if (_isLoading)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Style="color:white;" />
+                        }
+                        else
+                        {
+                            @:Sign In
+                        }
+                    </MudButton>
+                </div>
+            </EditForm>
+
+            <div style="text-align:center;margin-top:1.5rem;">
+                <MudText Typo="Typo.body2" Style="color:var(--text-secondary);">
+                    Demo credentials: admin@orthoflow.ai / Admin@123
+                </MudText>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .login-page {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+        background: var(--bg-primary);
+    }
+
+    .login-bg {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+    }
+
+    .login-shape {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(80px);
+        opacity: 0.4;
+    }
+
+    .dark-mode .login-shape {
+        opacity: 0.15;
+    }
+
+    .login-shape-1 {
+        width: 500px;
+        height: 500px;
+        background: #6366f1;
+        top: -150px;
+        right: -100px;
+    }
+
+    .login-shape-2 {
+        width: 400px;
+        height: 400px;
+        background: #8b5cf6;
+        bottom: -100px;
+        left: -100px;
+    }
+
+    .login-shape-3 {
+        width: 300px;
+        height: 300px;
+        background: #a855f7;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+
+    .login-container {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        max-width: 420px;
+        padding: 1.5rem;
+    }
+
+    .login-card {
+        background: var(--bg-glass);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid var(--bg-glass-border);
+        border-radius: var(--radius-xl);
+        padding: 2.5rem;
+        box-shadow: var(--shadow-xl);
+    }
+
+    .login-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .login-logo {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        background: var(--accent-gradient);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    .login-field .mud-input-root {
+        border-radius: var(--radius-md) !important;
+    }
+</style>
+
+@code {
+    private LoginRequest _model = new();
+    private bool _isLoading;
+    private bool _showPassword;
+
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    private async Task HandleLogin()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await AuthService.LoginAsync(_model);
+            if (result != null && !string.IsNullOrEmpty(result.Token))
+            {
+                AuthStateProvider.NotifyAuthenticationStateChanged();
+                Snackbar.Add("Welcome back!", Severity.Success);
+                Navigation.NavigateTo(ReturnUrl ?? "/", forceLoad: true);
+            }
+            else
+            {
+                Snackbar.Add("Invalid email or password", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Login failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+}
