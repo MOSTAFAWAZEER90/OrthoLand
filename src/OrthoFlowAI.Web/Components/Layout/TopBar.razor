@@ -1,3 +1,4 @@
+@inject IApiService ApiService
 @inject IAuthService AuthService
 @inject NavigationManager Navigation
 
@@ -23,17 +24,44 @@
                            Style="color:var(--text-secondary);" />
         </MudTooltip>
 
-        <MudTooltip Text="Notifications">
-            <MudBadge Content="@_notificationCount" Color="Color.Error" Overlap="true" Visible="@(_notificationCount > 0)">
-                <MudIconButton Icon="@Icons.Material.Filled.Notifications"
-                               Size="Size.Medium"
-                               Style="color:var(--text-secondary);" />
-            </MudBadge>
-        </MudTooltip>
+        <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" OpenChanged="OnNotificationsOpened">
+            @* MudBlazor 9: a custom activator must toggle the menu via its MenuContext,
+               otherwise the menu never opens (this was the case for both top-bar menus). *@
+            <ActivatorContent Context="menu">
+                <div style="padding:0.5rem;cursor:pointer;display:flex;" title="Notifications" @onclick="menu.ToggleAsync">
+                    <MudBadge Content="@_notificationCount" Color="Color.Error" Overlap="true" Visible="@(_notificationCount > 0)">
+                        <MudIcon Icon="@Icons.Material.Filled.Notifications" Style="color:var(--text-secondary);" />
+                    </MudBadge>
+                </div>
+            </ActivatorContent>
+            <ChildContent>
+                <div style="width:320px;max-height:420px;overflow-y:auto;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 1rem;">
+                        <MudText Typo="Typo.subtitle2" Style="font-weight:700;">Notifications</MudText>
+                        @if (_notificationCount > 0)
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="MarkAllRead">Mark all read</MudButton>
+                        }
+                    </div>
+                    @if (_notifications.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Style="padding:1rem;color:var(--text-tertiary);">No notifications</MudText>
+                    }
+                    @foreach (var n in _notifications)
+                    {
+                        <div style="padding:0.6rem 1rem;border-top:1px solid var(--border-light);@(n.IsRead ? "" : "background:rgba(99,102,241,0.06);")">
+                            <MudText Typo="Typo.body2" Style="font-weight:600;">@n.Title</MudText>
+                            <MudText Typo="Typo.caption" Style="color:var(--text-secondary);display:block;white-space:pre-line;">@n.Message</MudText>
+                            <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">@n.CreatedAt.ToString("dd/MM HH:mm")</MudText>
+                        </div>
+                    }
+                </div>
+            </ChildContent>
+        </MudMenu>
 
         <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
-            <ActivatorContent>
-                <div style="display:flex;align-items:center;gap:0.5rem;padding:0.25rem 0.5rem;border-radius:var(--radius-md);cursor:pointer;transition:background var(--transition-fast);"
+            <ActivatorContent Context="menu">
+                <div @onclick="menu.ToggleAsync" style="display:flex;align-items:center;gap:0.5rem;padding:0.25rem 0.5rem;border-radius:var(--radius-md);cursor:pointer;transition:background var(--transition-fast);"
                      @onmouseover="@(e => { })">
                     <MudAvatar Size="Size.Small" Style="background:var(--accent-gradient);color:white;font-weight:600;font-size:0.75rem;">
                         @_userInitials
@@ -59,7 +87,9 @@
     private string _searchTerm = "";
     private string _userName = "User";
     private string _userInitials = "U";
-    private int _notificationCount = 3;
+    // Was a hard-coded 3; now the user's real unread count.
+    private int _notificationCount;
+    private List<NotificationResponse> _notifications = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -68,7 +98,29 @@
         {
             _userName = $"{user.FirstName} {user.LastName}";
             _userInitials = $"{(user.FirstName.Length > 0 ? user.FirstName[0] : "")}{(user.LastName.Length > 0 ? user.LastName[0] : "")}";
+            await LoadUnreadCount();
         }
+    }
+
+    private async Task LoadUnreadCount()
+    {
+        var count = await ApiService.GetAsync<ApiResponse<int>>("api/notifications/unread-count");
+        _notificationCount = count?.Data ?? 0;
+    }
+
+    private async Task OnNotificationsOpened(bool open)
+    {
+        if (!open) return;
+        var page = await ApiService.GetAsync<ApiResponse<PagedResult<NotificationResponse>>>("api/notifications?pageNumber=1&pageSize=8");
+        _notifications = page?.Data?.Items ?? new();
+        StateHasChanged();
+    }
+
+    private async Task MarkAllRead()
+    {
+        await ApiService.PutAsync<ApiResponse>("api/notifications/read-all");
+        _notificationCount = 0;
+        foreach (var n in _notifications) n.IsRead = true;
     }
 
     private void OnSearchKeyDown(KeyboardEventArgs e)

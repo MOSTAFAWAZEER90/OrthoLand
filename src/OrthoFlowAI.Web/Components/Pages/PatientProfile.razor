@@ -3,6 +3,7 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 @inject IDialogService DialogService
+@inject PatientActions Actions
 
 <PageTitle>Patient Profile - OrthoFlowAI</PageTitle>
 
@@ -291,13 +292,82 @@ else
 
         <MudTabPanel Text="Appointments" Icon="@Icons.Material.Filled.CalendarMonth">
             <div style="padding:1.5rem;">
-                <MudText Typo="Typo.body2" Style="color:var(--text-secondary);">Patient appointments coming soon.</MudText>
+                @if (_appointments.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Style="color:var(--text-secondary);">No appointments yet.</MudText>
+                }
+                else
+                {
+                    <MudSimpleTable Dense="true" Hover="true">
+                        <thead><tr><th>Date</th><th>Time</th><th>Type</th><th>Doctor</th><th>Status</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var a in _appointments.OrderByDescending(x => x.AppointmentDate))
+                            {
+                                <tr>
+                                    <td>@a.AppointmentDate.ToString("dd/MM/yyyy")</td>
+                                    <td>@a.AppointmentDate.ToString("HH:mm")</td>
+                                    <td>@a.Type</td>
+                                    <td>@a.DoctorName</td>
+                                    <td>@a.Status</td>
+                                    <td>
+                                        @if (a.AppointmentDate >= DateTime.Now && a.Status is AppointmentStatus.Scheduled or AppointmentStatus.Confirmed)
+                                        {
+                                            <MudTooltip Text="تذكير واتساب">
+                                                <MudIconButton Icon="@Icons.Custom.Brands.WhatsApp" Size="Size.Small" Style="color:#25D366;"
+                                                               OnClick="@(() => Actions.WhatsAppAsync("appointments", a.Id))" />
+                                            </MudTooltip>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
             </div>
         </MudTabPanel>
 
         <MudTabPanel Text="Invoices" Icon="@Icons.Material.Filled.Receipt">
             <div style="padding:1.5rem;">
-                <MudText Typo="Typo.body2" Style="color:var(--text-secondary);">Patient invoices coming soon.</MudText>
+                @if (_invoices.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Style="color:var(--text-secondary);">No invoices yet.</MudText>
+                }
+                else
+                {
+                    <MudSimpleTable Dense="true" Hover="true">
+                        <thead><tr><th>Invoice</th><th>Date</th><th>Total</th><th>Paid</th><th>Remaining</th><th>Status</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var inv in _invoices)
+                            {
+                                <tr>
+                                    <td>@inv.InvoiceNumber</td>
+                                    <td>@inv.CreatedAt.ToString("dd/MM/yyyy")</td>
+                                    <td>@inv.TotalAmount.ToString("N0") ج.م</td>
+                                    <td style="color:var(--success);">@inv.PaidAmount.ToString("N0") ج.م</td>
+                                    <td style="color:var(--error, #d32f2f);">@inv.RemainingAmount.ToString("N0") ج.م</td>
+                                    <td>@inv.PaymentStatus</td>
+                                    <td style="white-space:nowrap;">
+                                        @if (inv.PaymentStatus != PaymentStatus.Paid)
+                                        {
+                                            <MudTooltip Text="تقسيط">
+                                                <MudIconButton Icon="@Icons.Material.Filled.CalendarMonth" Size="Size.Small"
+                                                               OnClick="@(() => OpenInstallments(inv))" />
+                                            </MudTooltip>
+                                            <MudTooltip Text="تذكير واتساب">
+                                                <MudIconButton Icon="@Icons.Custom.Brands.WhatsApp" Size="Size.Small" Style="color:#25D366;"
+                                                               OnClick="@(() => Actions.WhatsAppAsync("invoices", inv.Id))" />
+                                            </MudTooltip>
+                                        }
+                                        <MudTooltip Text="تحميل PDF">
+                                            <MudIconButton Icon="@Icons.Material.Filled.PictureAsPdf" Size="Size.Small" Style="color:#d32f2f;"
+                                                           OnClick="@(() => Actions.DownloadInvoicePdfAsync(inv.Id, inv.InvoiceNumber))" />
+                                        </MudTooltip>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
             </div>
         </MudTabPanel>
 
@@ -326,6 +396,8 @@ else
     [Parameter] public string Id { get; set; } = "";
 
     private PatientResponse? _patient;
+    private List<AppointmentResponse> _appointments = new();
+    private List<InvoiceResponse> _invoices = new();
     private bool _loading = true;
     private int _activeTab = 0;
 
@@ -421,6 +493,16 @@ else
         try
         {
             _patient = await ApiService.GetAsync<PatientResponse>($"api/patients/{Id}");
+            if (_patient != null)
+            {
+                // These tabs used to say "coming soon".
+                var appts = await ApiService.PostAsync<PaginatedApiResponse<AppointmentResponse>>("api/appointments/filter",
+                    new AppointmentFilterRequest { PatientId = Id, PageNumber = 1, PageSize = 200 });
+                _appointments = appts?.Data ?? new();
+                var invs = await ApiService.PostAsync<PaginatedApiResponse<InvoiceResponse>>("api/invoices/filter",
+                    new InvoiceFilterRequest { PatientId = Id, PageNumber = 1, PageSize = 100 });
+                _invoices = invs?.Data ?? new();
+            }
         }
         catch (Exception ex)
         {
@@ -431,6 +513,18 @@ else
             _loading = false;
             StateHasChanged();
         }
+    }
+
+    private async Task OpenInstallments(InvoiceResponse invoice)
+    {
+        var parameters = new DialogParameters<InstallmentPlanDialog>
+        {
+            { x => x.InvoiceId, invoice.Id },
+            { x => x.InvoiceNumber, invoice.InvoiceNumber }
+        };
+        var dialog = await DialogService.ShowAsync<InstallmentPlanDialog>("تقسيط", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
+        await dialog.Result;
     }
 
     private string GetStatusStyle(PatientStatus status) => status switch

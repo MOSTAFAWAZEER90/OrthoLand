@@ -10,6 +10,23 @@
         </div>
     </TitleContent>
     <DialogContent>
+        @if (!IsEdit)
+        {
+            <div style="display:flex;gap:0.5rem;">
+                <MudTextField @bind-Value="Model.FirstName" Label="First Name" Required="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="Model.LastName" Label="Last Name" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </div>
+            <MudTextField @bind-Value="Model.Email" Label="Email (login)" Required="true" InputType="InputType.Email" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="Model.Phone" Label="Phone" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <div style="display:flex;gap:0.5rem;">
+                <MudSelect T="string" @bind-Value="Model.Role" Label="Role" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem T="string" Value="@("Receptionist")">Receptionist</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Assistant")">Assistant</MudSelectItem>
+                </MudSelect>
+                <MudTextField @bind-Value="Model.Password" Label="Temporary password" Required="true" InputType="InputType.Password" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              HelperText="8+ chars, upper, lower, digit, symbol" />
+            </div>
+        }
         <MudTextField @bind-Value="Model.Position" Label="Position (e.g. Receptionist, Assistant)" Variant="Variant.Outlined" Margin="Margin.Dense" />
         <MudTextField @bind-Value="Model.Department" Label="Department" Variant="Variant.Outlined" Margin="Margin.Dense" />
         <MudSelect T="StaffStatus" @bind-Value="Model.Status" Label="Status" Variant="Variant.Outlined" Margin="Margin.Dense">
@@ -20,14 +37,7 @@
         </MudSelect>
         <MudDatePicker @bind-Date="Model.HireDate" Label="Hire Date" Variant="Variant.Outlined" Margin="Margin.Dense" />
         <MudNumericField @bind-Value="Model.Salary" Label="Salary" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" />
-        @if (!IsEdit)
-        {
-            <div style="background:var(--warning-light);color:var(--warning);padding:0.6rem;border-radius:var(--radius-md);margin-top:0.5rem;">
-                <MudText Typo="Typo.caption">
-                    Staff profiles are linked to existing clinic user accounts. Please ensure the user account exists before linking.
-                </MudText>
-            </div>
-        }
+
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Cancel" Variant="Variant.Outlined" Style="margin-right:0.5rem;">Cancel</MudButton>
@@ -83,7 +93,13 @@
                 : await ApiService.PostAsync<ApiResponse>("api/staff", new StaffDto
                 {
                     UserId = Model.UserId,
-                    Position = Model.Position,
+                    FirstName = Model.FirstName,
+                    LastName = Model.LastName,
+                    Email = Model.Email,
+                    Phone = Model.Phone,
+                    Role = Model.Role,
+                    Password = Model.Password,
+                    Position = Model.Position ?? Model.Role,
                     Department = Model.Department,
                     Status = Model.Status,
                     HireDate = Model.HireDate,
@@ -97,7 +113,7 @@
             }
             else
             {
-                Snackbar.Add("Failed to save staff", Severity.Error);
+                Snackbar.Add(ApiService.LastErrorMessage ?? "Failed to save staff", Severity.Error);
             }
         }
         catch (Exception ex)
@@ -114,6 +130,12 @@
     protected class StaffModel
     {
         public string UserId { get; set; } = string.Empty;
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
+        public string? Email { get; set; }
+        public string? Phone { get; set; }
+        public string Role { get; set; } = "Receptionist";
+        public string? Password { get; set; }
         public string? Position { get; set; }
         public string? Department { get; set; }
         public StaffStatus Status { get; set; } = StaffStatus.Active;

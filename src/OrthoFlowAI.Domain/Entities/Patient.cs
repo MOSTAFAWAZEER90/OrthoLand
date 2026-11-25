@@ -37,6 +37,9 @@ public class Patient : TenantEntity
     public string? DeviceToken { get; set; }
 
     public Doctor? Doctor { get; set; }
+
+    /// <summary>Assigned doctor's display name (read-only, not stored; needs Doctor.User loaded).</summary>
+    public string? DoctorName => Doctor?.User is { } u ? $"Dr. {u.FirstName} {u.LastName}" : null;
     public Branch? Branch { get; set; }
     public ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
     public ICollection<Photo> Photos { get; set; } = new List<Photo>();

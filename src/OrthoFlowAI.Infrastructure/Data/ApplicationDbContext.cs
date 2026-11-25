@@ -1009,7 +1009,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationIdentityUser>
             switch (entry.State)
             {
                 case EntityState.Added:
-                    entry.Entity.CreatedAt = DateTime.UtcNow;
+                    // BaseEntity already defaults CreatedAt to "now"; keep an explicit date
+                    // (e.g. imported or seeded history) instead of overwriting it.
+                    if (entry.Entity.CreatedAt == default) entry.Entity.CreatedAt = DateTime.UtcNow;
                     break;
                 case EntityState.Modified:
                     entry.Entity.UpdatedAt = DateTime.UtcNow;

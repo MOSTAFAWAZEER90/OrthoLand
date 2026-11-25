@@ -27,5 +27,9 @@ public class Appointment : TenantEntity
 
     public Patient Patient { get; set; } = null!;
     public Doctor Doctor { get; set; } = null!;
+
+    /// <summary>Display names for lists/calendars (read-only, not stored; need Patient / Doctor.User loaded).</summary>
+    public string? PatientName => Patient is { } p ? $"{p.FirstName} {p.LastName}" : null;
+    public string? DoctorName => Doctor?.User is { } u ? $"{u.FirstName} {u.LastName}" : null;
     public Branch? Branch { get; set; }
 }
