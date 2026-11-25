@@ -342,6 +342,18 @@ namespace OrthoFlowAI.Infrastructure.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("recurrence_pattern");
 
+                    b.Property<bool>("Reminder1DaySent")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("Reminder2HoursSent")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("Reminder3DaysSent")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("Reminder7DaysSent")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -833,6 +845,9 @@ namespace OrthoFlowAI.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("description");
 
+                    b.Property<DateTime?>("ExpiryDate")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -854,6 +869,9 @@ namespace OrthoFlowAI.Infrastructure.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("file_url");
 
+                    b.Property<string>("IpAddress")
+                        .HasColumnType("text");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
@@ -867,9 +885,24 @@ namespace OrthoFlowAI.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("patient_id");
 
+                    b.Property<string>("SignatureData")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SignatureImageUrl")
+                        .HasColumnType("text");
+
                     b.Property<DateTime?>("SignedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("signed_at");
+
+                    b.Property<string>("SignedById")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Tags")
+                        .HasColumnType("text");
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -884,6 +917,13 @@ namespace OrthoFlowAI.Infrastructure.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("text")
                         .HasColumnName("updated_by");
+
+                    b.Property<string>("UploadedById")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("UserAgent")
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -997,6 +1037,9 @@ namespace OrthoFlowAI.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("id");
 
+                    b.Property<string>("AppointmentId")
+                        .HasColumnType("text");
+
                     b.Property<string>("ClinicId")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1018,9 +1061,15 @@ namespace OrthoFlowAI.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("doctor_id");
 
+                    b.Property<bool>("IsAnonymous")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
+
+                    b.Property<string>("NPSComment")
+                        .HasColumnType("text");
 
                     b.Property<int?>("NPSScore")
                         .HasColumnType("integer")
@@ -1034,6 +1083,12 @@ namespace OrthoFlowAI.Infrastructure.Migrations
                     b.Property<int>("Rating")
                         .HasColumnType("integer")
                         .HasColumnName("rating");
+
+                    b.Property<int>("Sentiment")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Tags")
+                        .HasColumnType("text");
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -1064,6 +1119,92 @@ namespace OrthoFlowAI.Infrastructure.Migrations
                     b.HasIndex("PatientId");
 
                     b.ToTable("feedbacks", (string)null);
+                });
+
+            modelBuilder.Entity("OrthoFlowAI.Domain.Entities.Installment", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("ClinicId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("clinic_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTime>("DueDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("due_date");
+
+                    b.Property<DateTime?>("DueSoonReminderSentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("due_soon_reminder_sent_at");
+
+                    b.Property<string>("InvoiceId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("invoice_id");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer")
+                        .HasColumnName("number");
+
+                    b.Property<DateTime?>("OverdueReminderSentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("overdue_reminder_sent_at");
+
+                    b.Property<decimal>("PaidAmount")
+                        .HasColumnType("decimal(18,2)")
+                        .HasColumnName("paid_amount");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paid_at");
+
+                    b.Property<string>("PatientId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("patient_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicId");
+
+                    b.HasIndex("InvoiceId", "Number");
+
+                    b.HasIndex("Status", "DueDate");
+
+                    b.ToTable("installments", (string)null);
                 });
 
             modelBuilder.Entity("OrthoFlowAI.Domain.Entities.InventoryItem", b =>
@@ -1316,6 +1457,12 @@ namespace OrthoFlowAI.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("read_at");
 
+                    b.Property<string>("RelatedEntityId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("RelatedEntityType")
+                        .HasColumnType("text");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(300)
@@ -1500,6 +1647,9 @@ namespace OrthoFlowAI.Infrastructure.Migrations
                     b.Property<DateTime?>("DateOfBirth")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("date_of_birth");
+
+                    b.Property<string>("DeviceToken")
+                        .HasColumnType("text");
 
                     b.Property<string>("Diagnosis")
                         .HasColumnType("text")
@@ -1828,6 +1978,9 @@ namespace OrthoFlowAI.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("clinic_id");
 
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -1836,15 +1989,15 @@ namespace OrthoFlowAI.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("created_by");
 
-                    b.Property<decimal>("Discount")
-                        .HasColumnType("decimal(18,2)")
-                        .HasColumnName("discount");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
+                    b.Property<string>("Notes")
+                        .HasColumnType("text");
+
                     b.Property<string>("ReferralCode")
+                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("referral_code");
@@ -1853,21 +2006,30 @@ namespace OrthoFlowAI.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("referred_at");
 
+                    b.Property<decimal>("ReferredDiscount")
+                        .HasColumnType("decimal(18,2)")
+                        .HasColumnName("referred_discount");
+
                     b.Property<string>("ReferredPatientId")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("referred_patient_id");
+
+                    b.Property<decimal>("ReferrerDiscount")
+                        .HasColumnType("decimal(18,2)")
+                        .HasColumnName("referrer_discount");
 
                     b.Property<string>("ReferrerPatientId")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("referrer_patient_id");
 
-                    b.Property<decimal>("Reward")
+                    b.Property<decimal>("ReferrerReward")
                         .HasColumnType("decimal(18,2)")
-                        .HasColumnName("reward");
+                        .HasColumnName("referrer_reward");
 
                     b.Property<string>("Status")
+                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("status");
@@ -1996,6 +2158,9 @@ namespace OrthoFlowAI.Infrastructure.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("billing_period");
 
+                    b.Property<bool>("CancelAtPeriodEnd")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("ClinicId")
                         .IsRequired()
                         .HasColumnType("text")
@@ -2056,6 +2221,15 @@ namespace OrthoFlowAI.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("status");
+
+                    b.Property<string>("StripeCustomerId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("StripePriceId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("StripeSubscriptionId")
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("TrialEndsAt")
                         .HasColumnType("timestamp with time zone")
@@ -2533,6 +2707,25 @@ namespace OrthoFlowAI.Infrastructure.Migrations
                     b.Navigation("Patient");
                 });
 
+            modelBuilder.Entity("OrthoFlowAI.Domain.Entities.Installment", b =>
+                {
+                    b.HasOne("OrthoFlowAI.Domain.Entities.Clinic", "Clinic")
+                        .WithMany()
+                        .HasForeignKey("ClinicId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OrthoFlowAI.Domain.Entities.Invoice", "Invoice")
+                        .WithMany("Installments")
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Clinic");
+
+                    b.Navigation("Invoice");
+                });
+
             modelBuilder.Entity("OrthoFlowAI.Domain.Entities.InventoryItem", b =>
                 {
                     b.HasOne("OrthoFlowAI.Domain.Entities.Branch", "Branch")
@@ -2830,6 +3023,8 @@ namespace OrthoFlowAI.Infrastructure.Migrations
 
             modelBuilder.Entity("OrthoFlowAI.Domain.Entities.Invoice", b =>
                 {
+                    b.Navigation("Installments");
+
                     b.Navigation("Payments");
                 });
 

@@ -141,7 +141,12 @@ All entities are fully implemented with proper relationships:
 
 ---
 
-## 3. CREDENTIALS
+## 3. CREDENTIALS (Development only)
+
+These accounts are created ONLY when Seed:DemoData=true (appsettings.Development.json).
+In Production no demo data is seeded, the SuperAdmin is created only if
+Seed__SuperAdminPassword is provided, and the API refuses to start without a real
+Jwt__SecretKey and connection string.
 
 | Role | Email | Password |
 |------|-------|----------|

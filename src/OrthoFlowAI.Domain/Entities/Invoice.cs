@@ -22,4 +22,5 @@ public class Invoice : TenantEntity
     public Patient Patient { get; set; } = null!;
     public Doctor? Doctor { get; set; }
     public ICollection<Payment> Payments { get; set; } = new List<Payment>();
+    public ICollection<Installment> Installments { get; set; } = new List<Installment>();
 }

@@ -20,6 +20,7 @@ public class UnitOfWork : IUnitOfWork
     private IRepository<Photo>? _photos;
     private IRepository<Invoice>? _invoices;
     private IRepository<Payment>? _payments;
+    private IRepository<Installment>? _installments;
     private IRepository<Document>? _documents;
     private IRepository<Notification>? _notifications;
     private IRepository<PainReport>? _painReports;
@@ -48,6 +49,7 @@ public class UnitOfWork : IUnitOfWork
     public IRepository<Photo> Photos => _photos ??= new GenericRepository<Photo>(_context);
     public IRepository<Invoice> Invoices => _invoices ??= new GenericRepository<Invoice>(_context);
     public IRepository<Payment> Payments => _payments ??= new GenericRepository<Payment>(_context);
+    public IRepository<Installment> Installments => _installments ??= new GenericRepository<Installment>(_context);
     public IRepository<Document> Documents => _documents ??= new GenericRepository<Document>(_context);
     public IRepository<Notification> Notifications => _notifications ??= new GenericRepository<Notification>(_context);
     public IRepository<PainReport> PainReports => _painReports ??= new GenericRepository<PainReport>(_context);

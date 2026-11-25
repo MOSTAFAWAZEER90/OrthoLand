@@ -8,6 +8,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using OrthoFlowAI.Api.Hubs;
 using OrthoFlowAI.Api.Middleware;
+using OrthoFlowAI.Api.Security;
+using OrthoFlowAI.Api.Storage;
 using OrthoFlowAI.Application;
 using OrthoFlowAI.Application.Services;
 using OrthoFlowAI.Infrastructure;
@@ -38,7 +40,12 @@ try
 
     var configuration = builder.Configuration;
 
+    // Refuse to start with missing or publicly-known secrets.
+    StartupSecurityValidator.ValidateOrThrow(configuration, builder.Environment);
+
     builder.Services.AddInfrastructure(configuration);
+    builder.Services.AddSingleton<PrivateFileStore>();
+    builder.Services.AddSingleton<SignedFileUrlService>();
     builder.Services.AddApplication();
 
     builder.Services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
@@ -158,7 +165,10 @@ try
 
     builder.Services.AddHealthChecks();
 
-    builder.Services.AddControllers();
+    // Several endpoints return EF entities whose navigations point back at each other
+    // (Patient -> Doctor -> Patients -> ...), which made System.Text.Json throw mid-response.
+    builder.Services.AddControllers().AddJsonOptions(o =>
+        o.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles);
     builder.Services.AddEndpointsApiExplorer();
 
     builder.Services.AddSwaggerGen(options =>
@@ -200,9 +210,23 @@ try
 
     var app = builder.Build();
 
+    // Migrate first: Hangfire (configured below) needs the database to exist,
+    // so on a fresh server it crashed before EF could create it.
+    Log.Information("Applying database migrations and seeding data");
+    using (var scope = app.Services.CreateScope())
+    {
+        var services = scope.ServiceProvider;
+        var dbContext = services.GetRequiredService<ApplicationDbContext>();
+        await dbContext.Database.MigrateAsync();
+        var userManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<OrthoFlowAI.Infrastructure.Identity.ApplicationIdentityUser>>();
+        var roleManager = services.GetRequiredService<OrthoFlowAI.Infrastructure.Identity.ApplicationRoleManager>();
+        await roleManager.SeedRolesAsync();
+        var seedOptions = configuration.GetSection(SeedOptions.SectionName).Get<SeedOptions>() ?? new SeedOptions();
+        await SeedData.SeedAsync(dbContext, userManager, roleManager, seedOptions);
+    }
+
+
     app.UseMiddleware<ExceptionHandlingMiddleware>();
-    app.UseMiddleware<AuditMiddleware>();
-    app.UseMiddleware<TenantMiddleware>();
 
     app.UseSerilogRequestLogging(options =>
     {
@@ -220,17 +244,36 @@ try
     app.UseCors("AllowAll");
     app.UseRateLimiter();
     app.UseAuthentication();
+    // Tenant + audit need the authenticated user, so they run after UseAuthentication.
+    app.UseMiddleware<TenantMiddleware>();
+    app.UseMiddleware<AuditMiddleware>();
     app.UseAuthorization();
 
-    app.UseSwagger();
-    app.UseSwaggerUI(options =>
+    // Swagger exposes the full API surface; only on when explicitly enabled (Development config).
+    if (configuration.GetValue<bool>("Swagger:Enabled"))
     {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "OrthoFlowAI API V1");
-        options.RoutePrefix = "swagger";
-        options.DisplayRequestDuration();
-        options.EnableFilter();
-    });
+        app.UseSwagger();
+        app.UseSwaggerUI(options =>
+        {
+            options.SwaggerEndpoint("/swagger/v1/swagger.json", "OrthoFlowAI API V1");
+            options.RoutePrefix = "swagger";
+            options.DisplayRequestDuration();
+            options.EnableFilter();
+        });
+    }
 
+    // Uploaded patient files used to live under wwwroot/uploads and were served to
+    // anyone with the link. Never serve that folder statically; files are only
+    // reachable through the authorized / signed-URL endpoints.
+    app.Use(async (context, next) =>
+    {
+        if (context.Request.Path.StartsWithSegments("/uploads"))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+        await next();
+    });
     app.UseStaticFiles();
     app.MapControllers();
     app.MapHub<NotificationHub>("/hubs/notifications");
@@ -299,18 +342,6 @@ try
         }
     });
 
-    Log.Information("Applying database migrations and seeding data");
-    using (var scope = app.Services.CreateScope())
-    {
-        var services = scope.ServiceProvider;
-        var dbContext = services.GetRequiredService<ApplicationDbContext>();
-        await dbContext.Database.MigrateAsync();
-        var userManager = services.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<OrthoFlowAI.Infrastructure.Identity.ApplicationIdentityUser>>();
-        var roleManager = services.GetRequiredService<OrthoFlowAI.Infrastructure.Identity.ApplicationRoleManager>();
-        await roleManager.SeedRolesAsync();
-        await SeedData.SeedAsync(dbContext, userManager, roleManager);
-    }
-
     Log.Information("OrthoFlowAI API started successfully on {Urls}", app.Urls);
     app.Run();
 }
@@ -343,12 +374,12 @@ static void SetupRecurringJobs(IServiceProvider services)
         "0 * * * *", // Every hour
         TimeZoneInfo.Local);
 
-    // Run daily at 9 AM for payment reminders
+    // Daily at 10 AM clinic time: instalment "due soon" / "overdue" WhatsApp reminders.
     RecurringJob.AddOrUpdate<IReminderService>(
         "payment-reminders",
         s => s.SendPaymentDueRemindersAsync(),
-        "0 9 * * *", // Daily at 9 AM
-        TimeZoneInfo.Local);
+        "0 10 * * *",
+        ClinicTimeZone());
 
     // Run weekly on Monday at 8 AM for treatment reminders
     RecurringJob.AddOrUpdate<IReminderService>(
@@ -371,12 +402,16 @@ static void SetupRecurringJobs(IServiceProvider services)
         "0 8 * * *", // Daily at 8 AM
         TimeZoneInfo.Local);
 
-    // Process all reminders every 30 minutes
-    RecurringJob.AddOrUpdate<IReminderService>(
-        "all-reminders",
-        s => s.ProcessAllRemindersAsync(),
-        "*/30 * * * *", // Every 30 minutes
-        TimeZoneInfo.Local);
+    // NOTE: the old "all-reminders" job (every 30 min) re-ran payment, birthday and
+    // treatment reminders 48 times a day, which would spam patients once WhatsApp is on.
+    // Each reminder type above has its own schedule, so it is removed.
+    RecurringJob.RemoveIfExists("all-reminders");
+}
+
+static TimeZoneInfo ClinicTimeZone()
+{
+    try { return TimeZoneInfo.FindSystemTimeZoneById("Africa/Cairo"); }
+    catch (TimeZoneNotFoundException) { return TimeZoneInfo.Local; }
 }
 
 class HangfireDashboardAuthorizationFilter : IDashboardAuthorizationFilter

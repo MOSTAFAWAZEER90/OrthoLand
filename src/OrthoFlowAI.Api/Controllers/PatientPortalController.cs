@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using OrthoFlowAI.Api.Storage;
 using OrthoFlowAI.Application.DTOs;
 using OrthoFlowAI.Domain.Common;
 using OrthoFlowAI.Domain.Entities;
@@ -17,11 +18,13 @@ public class PatientPortalController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<PatientPortalController> _logger;
+    private readonly SignedFileUrlService _signer;
 
-    public PatientPortalController(IUnitOfWork unitOfWork, ILogger<PatientPortalController> logger)
+    public PatientPortalController(IUnitOfWork unitOfWork, ILogger<PatientPortalController> logger, SignedFileUrlService signer)
     {
         _unitOfWork = unitOfWork;
         _logger = logger;
+        _signer = signer;
     }
 
     private string CurrentUserId =>
@@ -161,7 +164,7 @@ public class PatientPortalController : ControllerBase
                 Id = p.Id,
                 PatientId = p.PatientId,
                 DoctorId = p.DoctorId,
-                Url = p.Url,
+                Url = string.IsNullOrEmpty(p.Url) ? string.Empty : _signer.CreateUrl("photos", p.Id),
                 FileName = p.FileName,
                 FileType = p.FileType,
                 FileSize = p.FileSize,

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using OrthoFlowAI.Api.Storage;
 using OrthoFlowAI.Application.DTOs;
 using OrthoFlowAI.Application.Services;
 using OrthoFlowAI.Domain.Common;
@@ -15,11 +16,35 @@ public class DocumentsController : ControllerBase
 {
     private readonly IDocumentService _documentService;
     private readonly ILogger<DocumentsController> _logger;
+    private readonly PrivateFileStore _files;
 
-    public DocumentsController(IDocumentService documentService, ILogger<DocumentsController> logger)
+    public DocumentsController(IDocumentService documentService, ILogger<DocumentsController> logger, PrivateFileStore files)
     {
         _documentService = documentService;
         _logger = logger;
+        _files = files;
+    }
+
+    /// <summary>
+    /// Download a document's file. Requires the caller's JWT, and the tenant filter
+    /// guarantees the document belongs to the caller's clinic.
+    /// </summary>
+    [HttpGet("{id}/file")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Download(string id)
+    {
+        var result = await _documentService.GetByIdAsync(id);
+        if (!result.Success || result.Data == null)
+            return NotFound();
+
+        var path = _files.ResolvePath(result.Data.FileUrl);
+        if (path == null || !System.IO.File.Exists(path))
+            return NotFound();
+
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        // Always an attachment so uploaded HTML/SVG can never run in the API origin.
+        return PhysicalFile(path, "application/octet-stream", result.Data.FileName);
     }
 
     /// <summary>
@@ -69,25 +94,18 @@ public class DocumentsController : ControllerBase
         var clinicId = HttpContext.Items["ClinicId"]?.ToString() ?? string.Empty;
         var uploadedById = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
 
-        // Save file
-        var extension = Path.GetExtension(request.File.FileName);
-        var safeName = $"{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
-        var relativeFolder = $"uploads/documents/{clinicId}";
-        var root = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", relativeFolder);
-        Directory.CreateDirectory(root);
-
-        var filePath = Path.Combine(root, safeName);
-        await using (var stream = System.IO.File.Create(filePath))
+        // Save file in private storage (not under wwwroot)
+        string fileUrl;
+        await using (var stream = request.File.OpenReadStream())
         {
-            await request.File.CopyToAsync(stream);
+            fileUrl = await _files.SaveAsync(stream, "documents", clinicId,
+                Path.GetExtension(request.File.FileName), HttpContext.RequestAborted);
         }
-
-        var fileUrl = $"/{relativeFolder}/{safeName}";
 
         var createRequest = new CreateDocumentRequest
         {
             PatientId = request.PatientId,
-            FileName = request.File.FileName,
+            FileName = Path.GetFileName(request.File.FileName),
             Type = request.Type,
             Description = request.Description,
             Tags = request.Tags,

@@ -19,6 +19,7 @@ using OrthoFlowAI.Infrastructure.Settings;
 using SendGrid;
 using StackExchange.Redis;
 using Twilio;
+using OrthoFlowAI.Infrastructure.WhatsApp;
 
 namespace OrthoFlowAI.Infrastructure;
 
@@ -65,37 +66,8 @@ public static class ServiceRegistration
         var jwtSettings = new JwtSettings();
         configuration.GetSection(JwtSettings.SectionName).Bind(jwtSettings);
 
-        services.AddAuthentication(options =>
-            {
-                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-            })
-            .AddJwtBearer(options =>
-            {
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidateLifetime = true,
-                    ValidateIssuerSigningKey = true,
-                    ValidIssuer = jwtSettings.Issuer,
-                    ValidAudience = jwtSettings.Audience,
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SecretKey)),
-                    ClockSkew = TimeSpan.FromMinutes(5)
-                };
-                options.Events = new JwtBearerEvents
-                {
-                    OnAuthenticationFailed = context =>
-                    {
-                        if (context.Exception is SecurityTokenExpiredException)
-                        {
-                            context.Response.Headers["Token-Expired"] = "true";
-                        }
-                        return Task.CompletedTask;
-                    }
-                };
-            });
-
+        // JWT bearer authentication is configured once, in the API's Program.cs
+        // (registering it here too threw "Scheme already exists: Bearer" at startup).
         services.AddAuthorization();
 
         var redisConnectionString = configuration.GetConnectionString("Redis")
@@ -148,6 +120,7 @@ public static class ServiceRegistration
         services.AddScoped<IPatientService, PatientService>();
         services.AddScoped<IAppointmentService, AppointmentService>();
         services.AddScoped<IInvoiceService, InvoiceService>();
+        services.AddScoped<IInstallmentService, InstallmentService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IAuthService, AuthService>();
@@ -159,9 +132,17 @@ public static class ServiceRegistration
         services.AddScoped<IFeedbackService, FeedbackService>();
 
         // Notification Channels
-        services.AddSingleton<ISendGridClient>(sp => new SendGridClient(configuration[SendGridSettings.SectionName + ":ApiKey"] ?? ""));
+        // SendGridClient throws on an empty key, which crashed startup whenever email
+        // wasn't configured (e.g. every dev machine). Use a placeholder; the email
+        // channel reports itself unavailable while SendGrid:ApiKey is empty.
+        services.AddSingleton<ISendGridClient>(sp =>
+        {
+            var key = configuration[SendGridSettings.SectionName + ":ApiKey"];
+            return new SendGridClient(string.IsNullOrWhiteSpace(key) ? "not-configured" : key);
+        });
         services.AddScoped<INotificationChannel, EmailNotificationChannel>();
         services.AddScoped<INotificationChannel, TwilioNotificationChannel>();
+        services.AddWhatsApp(configuration);
         services.AddScoped<INotificationChannel, PushNotificationChannel>();
         services.AddScoped<INotificationChannelFactory, NotificationChannelFactory>();
 

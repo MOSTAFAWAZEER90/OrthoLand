@@ -18,7 +18,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationIdentityUser>
     {
     }
 
-    public void SetClinicId(string clinicId) => _clinicId = clinicId;
+    public void SetClinicId(string? clinicId) =>
+        _clinicId = string.IsNullOrWhiteSpace(clinicId) ? null : clinicId;
+
+    public string? CurrentClinicId => _clinicId;
 
     public DbSet<Clinic> Clinics => Set<Clinic>();
     public DbSet<ApplicationUser> ApplicationUsers => Set<ApplicationUser>();
@@ -30,6 +33,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationIdentityUser>
     public DbSet<Photo> Photos => Set<Photo>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<Installment> Installments => Set<Installment>();
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<PainReport> PainReports => Set<PainReport>();
@@ -50,12 +54,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationIdentityUser>
 
         foreach (var entityType in builder.Model.GetEntityTypes())
         {
+            // EF Core keeps only ONE unnamed query filter per entity: a second
+            // HasQueryFilter call silently replaces the first. Tenant + soft-delete
+            // must therefore be combined into a single expression.
             if (typeof(TenantEntity).IsAssignableFrom(entityType.ClrType))
             {
-                ApplyTenantFilter(builder, entityType.ClrType);
+                ApplyTenantAndSoftDeleteFilter(builder, entityType.ClrType);
             }
-
-            if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
+            else if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
             {
                 ApplySoftDeleteFilter(builder, entityType.ClrType);
             }
@@ -502,6 +508,44 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationIdentityUser>
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        builder.Entity<Installment>(e =>
+        {
+            e.ToTable("installments");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.ClinicId).HasColumnName("clinic_id").IsRequired();
+            e.Property(x => x.InvoiceId).HasColumnName("invoice_id").IsRequired();
+            e.Property(x => x.PatientId).HasColumnName("patient_id").IsRequired();
+            e.Property(x => x.Number).HasColumnName("number");
+            e.Property(x => x.DueDate).HasColumnName("due_date");
+            e.Property(x => x.Amount).HasColumnName("amount").HasColumnType("decimal(18,2)");
+            e.Property(x => x.PaidAmount).HasColumnName("paid_amount").HasColumnType("decimal(18,2)");
+            e.Property(x => x.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.PaidAt).HasColumnName("paid_at");
+            e.Property(x => x.DueSoonReminderSentAt).HasColumnName("due_soon_reminder_sent_at");
+            e.Property(x => x.OverdueReminderSentAt).HasColumnName("overdue_reminder_sent_at");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.IsDeleted).HasColumnName("is_deleted");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by");
+            e.Property(x => x.UpdatedBy).HasColumnName("updated_by");
+            e.Ignore(x => x.RemainingAmount);
+
+            e.HasIndex(x => x.ClinicId);
+            e.HasIndex(x => new { x.InvoiceId, x.Number });
+            e.HasIndex(x => new { x.Status, x.DueDate });
+
+            e.HasOne(x => x.Invoice)
+                .WithMany(i => i.Installments)
+                .HasForeignKey(x => x.InvoiceId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(x => x.Clinic)
+                .WithMany()
+                .HasForeignKey(x => x.ClinicId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         builder.Entity<Document>(e =>
         {
             e.ToTable("documents");
@@ -782,7 +826,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationIdentityUser>
             e.Property(r => r.ReferrerDiscount).HasColumnName("referrer_discount").HasColumnType("decimal(18,2)");
             e.Property(r => r.ReferredDiscount).HasColumnName("referred_discount").HasColumnType("decimal(18,2)");
             e.Property(r => r.ReferrerReward).HasColumnName("referrer_reward").HasColumnType("decimal(18,2)");
-            e.Property(r => r.Status).HasColumnName("status").HasMaxLength(50);
+            e.Property(r => r.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(50);
             e.Property(r => r.ReferredAt).HasColumnName("referred_at");
             e.Property(r => r.CreatedAt).HasColumnName("created_at");
             e.Property(r => r.UpdatedAt).HasColumnName("updated_at");
@@ -930,17 +974,57 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationIdentityUser>
             }
         }
 
+        EnforceTenantOnWrites();
+
         return base.SaveChangesAsync(cancellationToken);
     }
 
-    private void ApplyTenantFilter(ModelBuilder builder, Type entityType)
+    /// <summary>
+    /// When a tenant is set, new rows are stamped with it and writes to another
+    /// clinic's rows are rejected, so a clinic user can never create or modify
+    /// data that belongs to a different clinic.
+    /// </summary>
+    private void EnforceTenantOnWrites()
+    {
+        if (_clinicId is null) return;
+
+        foreach (var entry in ChangeTracker.Entries<TenantEntity>())
+        {
+            if (entry.State == EntityState.Added && string.IsNullOrEmpty(entry.Entity.ClinicId))
+            {
+                entry.Entity.ClinicId = _clinicId;
+            }
+
+            if (entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted
+                && entry.Entity.ClinicId != _clinicId)
+            {
+                throw new UnauthorizedAccessException(
+                    $"Cannot write {entry.Entity.GetType().Name} belonging to another clinic.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// e => !e.IsDeleted && (_clinicId == null || e.ClinicId == _clinicId)
+    /// When a tenant is set (any authenticated clinic user) queries only see that
+    /// clinic's rows. When no tenant is set (SuperAdmin, background jobs, seeding)
+    /// all clinics are visible, so those code paths must filter by ClinicId themselves.
+    /// </summary>
+    private void ApplyTenantAndSoftDeleteFilter(ModelBuilder builder, Type entityType)
     {
         var parameter = Expression.Parameter(entityType, "e");
-        var property = Expression.Property(parameter, nameof(TenantEntity.ClinicId));
-        var field = Expression.Field(Expression.Constant(this), nameof(_clinicId));
-        var comparison = Expression.Equal(property, field);
-        var lambda = Expression.Lambda(comparison, parameter);
-        builder.Entity(entityType).HasQueryFilter(lambda);
+        var notDeleted = Expression.Equal(
+            Expression.Property(parameter, nameof(BaseEntity.IsDeleted)),
+            Expression.Constant(false));
+
+        var clinicIdField = Expression.Field(Expression.Constant(this), nameof(_clinicId));
+        var noTenant = Expression.Equal(clinicIdField, Expression.Constant(null, typeof(string)));
+        var sameTenant = Expression.Equal(
+            Expression.Property(parameter, nameof(TenantEntity.ClinicId)),
+            clinicIdField);
+
+        var body = Expression.AndAlso(notDeleted, Expression.OrElse(noTenant, sameTenant));
+        builder.Entity(entityType).HasQueryFilter(Expression.Lambda(body, parameter));
     }
 
     private static void ApplySoftDeleteFilter(ModelBuilder builder, Type entityType)

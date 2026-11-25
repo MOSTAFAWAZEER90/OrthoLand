@@ -13,15 +13,25 @@
     <link rel="stylesheet" href="@Assets["css/mud-theme.css"]" />
     <link rel="stylesheet" href="@Assets["OrthoFlowAI.Web.styles.css"]" />
     <link rel="icon" type="image/png" href="favicon.png" />
-    <HeadOutlet />
+    <HeadOutlet @rendermode="InteractiveServer" />
 </head>
 
 <body class="mud-typography">
-    <Routes />
+    <Routes @rendermode="InteractiveServer" />
     <ReconnectModal />
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script>
+        // Saves bytes fetched through the API (e.g. invoice PDF) as a file.
+        window.orthoflowDownload = (fileName, base64, mime) => {
+            const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+            const url = URL.createObjectURL(new Blob([bytes], { type: mime || 'application/octet-stream' }));
+            const a = document.createElement('a');
+            a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 10000);
+        };
+        // Opens WhatsApp click-to-chat (wa.me) in a new tab.
+        window.orthoflowOpen = (url) => window.open(url, '_blank', 'noopener');
         window.toggleDarkMode = () => {
             const html = document.documentElement;
             if (html.classList.contains('dark-mode')) {

@@ -1,8 +1,8 @@
 @page "/invoices"
-@rendermode InteractiveServer
 @inject IApiService ApiService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject PatientActions Actions
 
 <PageTitle>Invoices - OrthoFlowAI</PageTitle>
 
@@ -147,9 +147,23 @@
                                            OnClick="@(() => RecordPayment(context))" />
                         </MudTooltip>
                     }
-                    <MudTooltip Text="View">
-                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small"
-                                       Style="color:var(--accent-primary);" />
+                    @if (context.PaymentStatus != PaymentStatus.Paid)
+                    {
+                        <MudTooltip Text="تقسيط">
+                            <MudIconButton Icon="@Icons.Material.Filled.CalendarMonth" Size="Size.Small"
+                                           Style="color:var(--accent-primary);"
+                                           OnClick="@(() => OpenInstallments(context))" />
+                        </MudTooltip>
+                        <MudTooltip Text="تذكير واتساب">
+                            <MudIconButton Icon="@Icons.Custom.Brands.WhatsApp" Size="Size.Small"
+                                           Style="color:#25D366;"
+                                           OnClick="@(() => Actions.WhatsAppAsync("invoices", context.Id))" />
+                        </MudTooltip>
+                    }
+                    <MudTooltip Text="تحميل PDF">
+                        <MudIconButton Icon="@Icons.Material.Filled.PictureAsPdf" Size="Size.Small"
+                                       Style="color:#d32f2f;"
+                                       OnClick="@(() => Actions.DownloadInvoicePdfAsync(context.Id, context.InvoiceNumber))" />
                     </MudTooltip>
                 </div>
             </MudTd>
@@ -214,6 +228,18 @@
         {
             await LoadInvoices();
         }
+    }
+
+    private async Task OpenInstallments(InvoiceResponse invoice)
+    {
+        var parameters = new DialogParameters<InstallmentPlanDialog>
+        {
+            { x => x.InvoiceId, invoice.Id },
+            { x => x.InvoiceNumber, invoice.InvoiceNumber }
+        };
+        var dialog = await DialogService.ShowAsync<InstallmentPlanDialog>("تقسيط", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true });
+        await dialog.Result;
     }
 
     private async Task RecordPayment(InvoiceResponse invoice)

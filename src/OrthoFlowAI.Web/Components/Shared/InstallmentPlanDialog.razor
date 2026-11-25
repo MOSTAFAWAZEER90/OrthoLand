@@ -1,0 +1,115 @@
+@inject IApiService ApiService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">تقسيط الفاتورة @InvoiceNumber</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            @if (_plan != null)
+            {
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    الإجمالي: @_plan.InvoiceTotal.ToString("#,0") ج.م —
+                    المدفوع: @_plan.PaidAmount.ToString("#,0") ج.م —
+                    المتبقي: <b>@_plan.RemainingAmount.ToString("#,0") ج.م</b>
+                </MudText>
+            }
+
+            <div style="display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap;">
+                <MudNumericField T="int" Label="عدد الأقساط" @bind-Value="_request.Count" Min="1" Max="60" Style="max-width:140px;" />
+                <MudNumericField T="int" Label="كل كام شهر" @bind-Value="_request.IntervalMonths" Min="1" Max="12" Style="max-width:140px;" />
+                <MudDatePicker Label="أول قسط" @bind-Date="_firstDue" Style="max-width:180px;" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_saving" OnClick="CreatePlan">
+                    @(_plan?.Installments.Count > 0 ? "إعادة التقسيط" : "قسّط")
+                </MudButton>
+            </div>
+
+            @if (_plan?.Installments.Count > 0)
+            {
+                <MudSimpleTable Dense="true" Class="mt-4">
+                    <thead><tr><th>#</th><th>الاستحقاق</th><th>المبلغ</th><th>المدفوع</th><th>الحالة</th></tr></thead>
+                    <tbody>
+                        @foreach (var i in _plan.Installments)
+                        {
+                            <tr>
+                                <td>@i.Number</td>
+                                <td>@i.DueDate.ToString("dd/MM/yyyy")</td>
+                                <td>@i.Amount.ToString("#,0")</td>
+                                <td>@i.PaidAmount.ToString("#,0")</td>
+                                <td style="color:@StatusColor(i.Status)">@StatusText(i.Status)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+                <MudText Typo="Typo.caption" Class="mt-2">إعادة التقسيط بتغيّر الأقساط اللي لسه متدفعتش بس.</MudText>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">إغلاق</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public string InvoiceId { get; set; } = string.Empty;
+    [Parameter] public string InvoiceNumber { get; set; } = string.Empty;
+
+    private InstallmentPlanResponse? _plan;
+    private readonly CreateInstallmentPlanRequest _request = new();
+    private DateTime? _firstDue = DateTime.Today.AddMonths(1);
+    private bool _loading = true;
+    private bool _saving;
+    private bool _changed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await ApiService.GetAsync<ApiResponse<InstallmentPlanResponse>>($"api/invoices/{InvoiceId}/installments");
+        _plan = result?.Data;
+        if (_plan?.Installments.Count > 0) _request.Count = _plan.Installments.Count(i => i.Status != InstallmentStatus.Paid);
+        if (_request.Count < 1) _request.Count = 12;
+        _loading = false;
+    }
+
+    private async Task CreatePlan()
+    {
+        _saving = true;
+        _request.FirstDueDate = _firstDue.HasValue ? DateTime.SpecifyKind(_firstDue.Value.Date, DateTimeKind.Utc) : null;
+        var result = await ApiService.PostAsync<ApiResponse<InstallmentPlanResponse>>($"api/invoices/{InvoiceId}/installments", _request);
+        _saving = false;
+
+        if (result?.Success == true)
+        {
+            _plan = result.Data;
+            _changed = true;
+            Snackbar.Add("تم تقسيط الفاتورة", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add(result?.Message ?? "التقسيط فشل", Severity.Error);
+        }
+    }
+
+    private void Close() => MudDialog.Close(DialogResult.Ok(_changed));
+
+    private static string StatusText(InstallmentStatus s) => s switch
+    {
+        InstallmentStatus.Paid => "مدفوع",
+        InstallmentStatus.PartiallyPaid => "مدفوع جزئياً",
+        InstallmentStatus.Overdue => "متأخر",
+        _ => "قادم",
+    };
+
+    private static string StatusColor(InstallmentStatus s) => s switch
+    {
+        InstallmentStatus.Paid => "var(--success)",
+        InstallmentStatus.Overdue => "var(--error, #d32f2f)",
+        _ => "inherit",
+    };
+}

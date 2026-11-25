@@ -1,5 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using Microsoft.JSInterop;
 
 namespace OrthoFlowAI.Web.Services;
 
@@ -8,12 +10,14 @@ public class ApiService : IApiService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<ApiService> _logger;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly IJSRuntime _js;
     private string? _authToken;
 
-    public ApiService(IHttpClientFactory httpClientFactory, ILogger<ApiService> logger)
+    public ApiService(IHttpClientFactory httpClientFactory, ILogger<ApiService> logger, IJSRuntime js)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
+        _js = js;
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true,
@@ -32,6 +36,83 @@ public class ApiService : IApiService
         return client;
     }
 
+    /// <summary>
+    /// Creates a client carrying the JWT. The token is kept per Blazor circuit, so after
+    /// a full page load (login does NavigateTo(forceLoad: true)) it is gone and every
+    /// call returned 401. Restore it from sessionStorage, where login saved it.
+    /// </summary>
+    private async Task<HttpClient> CreateAuthorizedClientAsync()
+    {
+        if (string.IsNullOrEmpty(_authToken))
+        {
+            try
+            {
+                _authToken = await _js.InvokeAsync<string?>("sessionStorage.getItem", "authToken");
+            }
+            catch (InvalidOperationException)
+            {
+                // JS interop is not available during static prerendering; the
+                // interactive render that follows will retry.
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+        }
+        return CreateClient();
+    }
+
+    /// <summary>
+    /// Every API endpoint answers { success, message, data } and paged endpoints put
+    /// { items, totalCount, pageNumber, pageSize } inside data. Many pages were written
+    /// against other shapes (a flat PaginatedApiResponse with a list in data, or the bare
+    /// DTO without the envelope), so they never received any data. Adapt here, once.
+    /// </summary>
+    internal T? DeserializeResponse<T>(string json)
+    {
+        var type = typeof(T);
+        try
+        {
+            if (JsonNode.Parse(json) is JsonObject root && root.ContainsKey("success") && root.ContainsKey("data"))
+            {
+                if (type.IsGenericType && type.GetGenericTypeDefinition().Name.StartsWith("PaginatedApiResponse"))
+                {
+                    if (root["data"] is JsonObject page && page["items"] is JsonArray items)
+                    {
+                        root["data"] = items.DeepClone();
+                        root["totalCount"] = page["totalCount"]?.DeepClone();
+                        root["pageNumber"] = page["pageNumber"]?.DeepClone();
+                        root["pageSize"] = page["pageSize"]?.DeepClone();
+                        json = root.ToJsonString();
+                    }
+                }
+                else if (!IsEnvelopeType(type))
+                {
+                    // Page expects the bare DTO: unwrap data.
+                    json = root["data"]?.ToJsonString() ?? "null";
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // Not JSON we understand; let the normal deserializer report it.
+        }
+
+        return JsonSerializer.Deserialize<T>(json, _jsonOptions);
+    }
+
+    private static bool IsEnvelopeType(Type type)
+    {
+        if (type == typeof(object) || type == typeof(JsonElement) || type == typeof(JsonNode) || type == typeof(JsonObject))
+            return true;
+        for (var t = type; t != null; t = t.BaseType)
+        {
+            var name = t.IsGenericType ? t.GetGenericTypeDefinition().Name : t.Name;
+            if (name.StartsWith("ApiResponse") || name.StartsWith("PaginatedApiResponse"))
+                return true;
+        }
+        return false;
+    }
+
     public void SetAuthorizationHeader(string token)
     {
         _authToken = token;
@@ -46,13 +127,13 @@ public class ApiService : IApiService
     {
         try
         {
-            var client = CreateClient();
+            var client = await CreateAuthorizedClientAsync();
             var response = await client.GetAsync(endpoint, ct);
 
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync(ct);
-                return JsonSerializer.Deserialize<T>(content, _jsonOptions);
+                return DeserializeResponse<T>(content);
             }
 
             _logger.LogWarning("API GET {Endpoint} returned {StatusCode}", endpoint, response.StatusCode);
@@ -69,13 +150,13 @@ public class ApiService : IApiService
     {
         try
         {
-            var client = CreateClient();
+            var client = await CreateAuthorizedClientAsync();
             var response = await client.PostAsJsonAsync(endpoint, data, _jsonOptions, ct);
 
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync(ct);
-                return JsonSerializer.Deserialize<T>(content, _jsonOptions);
+                return DeserializeResponse<T>(content);
             }
 
             var errorContent = await response.Content.ReadAsStringAsync(ct);
@@ -93,13 +174,13 @@ public class ApiService : IApiService
     {
         try
         {
-            var client = CreateClient();
+            var client = await CreateAuthorizedClientAsync();
             var response = await client.PutAsJsonAsync(endpoint, data, _jsonOptions, ct);
 
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync(ct);
-                return JsonSerializer.Deserialize<T>(content, _jsonOptions);
+                return DeserializeResponse<T>(content);
             }
 
             _logger.LogWarning("API PUT {Endpoint} returned {StatusCode}", endpoint, response.StatusCode);
@@ -116,7 +197,7 @@ public class ApiService : IApiService
     {
         try
         {
-            var client = CreateClient();
+            var client = await CreateAuthorizedClientAsync();
             var response = await client.DeleteAsync(endpoint, ct);
 
             if (response.IsSuccessStatusCode)
@@ -125,7 +206,7 @@ public class ApiService : IApiService
                 if (string.IsNullOrWhiteSpace(content))
                     return default;
 
-                return JsonSerializer.Deserialize<T>(content, _jsonOptions);
+                return DeserializeResponse<T>(content);
             }
 
             _logger.LogWarning("API DELETE {Endpoint} returned {StatusCode}", endpoint, response.StatusCode);
@@ -142,7 +223,7 @@ public class ApiService : IApiService
     {
         try
         {
-            var client = CreateClient();
+            var client = await CreateAuthorizedClientAsync();
             using var content = new MultipartFormDataContent();
 
             var fileContent = new ByteArrayContent(fileBytes);
@@ -162,7 +243,7 @@ public class ApiService : IApiService
             if (response.IsSuccessStatusCode)
             {
                 var responseContent = await response.Content.ReadAsStringAsync(ct);
-                return JsonSerializer.Deserialize<T>(responseContent, _jsonOptions);
+                return DeserializeResponse<T>(responseContent);
             }
 
             var errorContent = await response.Content.ReadAsStringAsync(ct);
@@ -193,7 +274,7 @@ public class ApiService : IApiService
     {
         try
         {
-            var client = CreateClient();
+            var client = await CreateAuthorizedClientAsync();
             var response = await client.GetAsync(endpoint, ct);
             if (response.IsSuccessStatusCode)
                 return await response.Content.ReadAsStreamAsync(ct);

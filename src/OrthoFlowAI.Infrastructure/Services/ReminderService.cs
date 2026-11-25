@@ -5,6 +5,8 @@ using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using OrthoFlowAI.Application.DTOs;
+using OrthoFlowAI.Application.Messaging;
+using OrthoFlowAI.Infrastructure.WhatsApp;
 using OrthoFlowAI.Application.Services;
 using OrthoFlowAI.Domain.Common;
 using OrthoFlowAI.Domain.Entities;
@@ -89,14 +91,16 @@ public class ReminderService : IReminderService
                 if (shouldRemind && appointment.Patient != null)
                 {
                     var patient = appointment.Patient;
-                    var doctorName = appointment.Doctor?.User != null 
-                        ? $"Dr. {appointment.Doctor.User.FirstName} {appointment.Doctor.User.LastName}" 
-                        : "your doctor";
+                    var doctorName = appointment.Doctor?.User != null
+                        ? $"{appointment.Doctor.User.FirstName} {appointment.Doctor.User.LastName}"
+                        : null;
+                    var clinic = await GetClinicAsync(patient.ClinicId);
 
-                    var message = $"Reminder: You have an appointment with {doctorName} on {appointment.AppointmentDate:MMMM dd, yyyy at hh:mm tt}. Please arrive 15 minutes early.";
-                    var subject = "Appointment Reminder";
+                    // Arabic by default and in Cairo time (dates are stored in UTC).
+                    var msg = PatientMessages.AppointmentReminder(patient.FirstName, clinic?.Name ?? "", doctorName,
+                        appointment.AppointmentDate, clinic?.Language);
 
-                    var result = await SendMultiChannelNotificationAsync(patient, subject, message, appointment);
+                    var result = await SendMultiChannelNotificationAsync(patient, msg.Subject, msg.Text, appointment, msg);
                     
                     if (result.Success)
                     {
@@ -231,41 +235,96 @@ public class ReminderService : IReminderService
         }
     }
 
+    /// <summary>
+    /// Instalment reminders: one "due soon" message 3 days before each instalment and one
+    /// "overdue" message after it is missed. Each is sent once (tracked on the instalment),
+    /// so running the job repeatedly never spams patients.
+    /// Invoices without an instalment plan get at most one reminder per 7 days.
+    /// </summary>
     public async Task<ApiResponse> SendPaymentDueRemindersAsync()
     {
         try
         {
             _logger.LogInformation("Starting payment due reminders job");
-            
-            var overdueInvoices = await _context.Invoices
-                .Include(i => i.Patient)
-                .Where(i => !i.IsDeleted 
-                    && (i.PaymentStatus == PaymentStatus.Pending 
-                        || i.PaymentStatus == PaymentStatus.Partial 
-                        || i.PaymentStatus == PaymentStatus.Overdue)
-                    && i.DueDate <= DateTime.UtcNow.AddDays(3))
-                .ToListAsync();
-
+            var now = DateTime.UtcNow;
+            var today = now.Date;
+            var soon = now.AddDays(3);
             var sentCount = 0;
             var failedCount = 0;
 
-            foreach (var invoice in overdueInvoices)
-            {
-                if (invoice.Patient != null && invoice.DueDate.HasValue)
-                {
-                    var daysOverdue = (DateTime.UtcNow - invoice.DueDate.Value).Days;
-                    var statusText = daysOverdue > 0 ? $"overdue by {daysOverdue} days" : $"due in {Math.Abs(daysOverdue)} days";
-                    
-                    var message = $"Payment reminder: Invoice #{invoice.InvoiceNumber} for ${invoice.TotalAmount:N2} is {statusText}. Please make payment to avoid service interruption.";
-                    var subject = "Payment Due Reminder";
+            var installments = await _context.Installments
+                .Include(i => i.Invoice).ThenInclude(inv => inv.Patient)
+                .Where(i => i.Status != InstallmentStatus.Paid
+                    && ((i.DueSoonReminderSentAt == null && i.DueDate <= soon && i.DueDate >= today)
+                        || (i.OverdueReminderSentAt == null && i.DueDate < today)))
+                .ToListAsync();
 
-                    var result = await SendMultiChannelNotificationAsync(invoice.Patient, subject, message, null);
-                    
-                    if (result.Success)
-                        sentCount++;
+            foreach (var inst in installments)
+            {
+                var patient = inst.Invoice?.Patient;
+                if (patient == null) continue;
+                var clinic = await GetClinicAsync(patient.ClinicId);
+                var overdue = inst.DueDate < today;
+
+                var msg = overdue
+                    ? PatientMessages.InstallmentOverdue(patient.FirstName, clinic?.Name ?? "", inst.Number,
+                        inst.Amount - inst.PaidAmount, inst.DueDate, clinic?.Language)
+                    : PatientMessages.InstallmentDueSoon(patient.FirstName, clinic?.Name ?? "", inst.Number,
+                        inst.Amount - inst.PaidAmount, inst.DueDate, clinic?.Language);
+
+                var result = await SendMultiChannelNotificationAsync(patient, msg.Subject, msg.Text, null, msg,
+                    inst.InvoiceId, "Invoice", NotificationType.PaymentDue);
+
+                if (result.Success)
+                {
+                    sentCount++;
+                    if (overdue)
+                    {
+                        inst.OverdueReminderSentAt = now;
+                        inst.Status = InstallmentStatus.Overdue;
+                    }
                     else
-                        failedCount++;
+                    {
+                        inst.DueSoonReminderSentAt = now;
+                    }
                 }
+                else
+                {
+                    failedCount++;
+                }
+            }
+            await _context.SaveChangesAsync();
+
+            // Invoices that are NOT on an instalment plan.
+            var weekAgo = now.AddDays(-7);
+            var invoices = await _context.Invoices
+                .Include(i => i.Patient)
+                .Where(i => (i.PaymentStatus == PaymentStatus.Pending
+                        || i.PaymentStatus == PaymentStatus.Partial
+                        || i.PaymentStatus == PaymentStatus.Overdue)
+                    && i.Status != InvoiceStatus.Cancelled
+                    && i.DueDate != null && i.DueDate <= soon
+                    && !_context.Installments.Any(x => x.InvoiceId == i.Id))
+                .ToListAsync();
+
+            foreach (var invoice in invoices)
+            {
+                if (invoice.Patient == null) continue;
+
+                var recentlyReminded = await _context.Notifications.AnyAsync(n =>
+                    n.RelatedEntityId == invoice.Id && n.Type == NotificationType.PaymentDue && n.CreatedAt >= weekAgo);
+                if (recentlyReminded) continue;
+
+                var clinic = await GetClinicAsync(invoice.ClinicId);
+                var remaining = InstallmentService.NetTotal(invoice) - invoice.PaidAmount;
+                var due = invoice.DueDate!.Value;
+                var msg = due < today
+                    ? PatientMessages.InstallmentOverdue(invoice.Patient.FirstName, clinic?.Name ?? "", 1, remaining, due, clinic?.Language)
+                    : PatientMessages.InstallmentDueSoon(invoice.Patient.FirstName, clinic?.Name ?? "", 1, remaining, due, clinic?.Language);
+
+                var result = await SendMultiChannelNotificationAsync(invoice.Patient, msg.Subject, msg.Text, null, msg,
+                    invoice.Id, "Invoice", NotificationType.PaymentDue);
+                if (result.Success) sentCount++; else failedCount++;
             }
 
             _logger.LogInformation("Payment due reminders completed. Sent: {Sent}, Failed: {Failed}", sentCount, failedCount);
@@ -276,6 +335,18 @@ public class ReminderService : IReminderService
             _logger.LogError(ex, "Error in payment due reminders job");
             return ApiResponse.FailResponse($"Error: {ex.Message}");
         }
+    }
+
+    private readonly Dictionary<string, Clinic?> _clinicCache = new();
+
+    private async Task<Clinic?> GetClinicAsync(string clinicId)
+    {
+        if (!_clinicCache.TryGetValue(clinicId, out var clinic))
+        {
+            clinic = await _context.Clinics.AsNoTracking().FirstOrDefaultAsync(c => c.Id == clinicId);
+            _clinicCache[clinicId] = clinic;
+        }
+        return clinic;
     }
 
     public async Task<ApiResponse> SendBirthdayGreetingsAsync()
@@ -388,7 +459,9 @@ public class ReminderService : IReminderService
         return ApiResponse.SuccessResponse($"All reminders processed. Successful jobs: {totalSent}/{results.Count}");
     }
 
-    private async Task<ApiResponse> SendMultiChannelNotificationAsync(Patient patient, string subject, string message, Appointment? appointment)
+    private async Task<ApiResponse> SendMultiChannelNotificationAsync(Patient patient, string subject, string message,
+        Appointment? appointment, PatientMessage? structured = null,
+        string? relatedEntityId = null, string? relatedEntityType = null, NotificationType? type = null)
     {
         var channels = _channelFactory.GetAvailableChannels().ToList();
         var results = new List<ApiResponse>();
@@ -413,7 +486,9 @@ public class ReminderService : IReminderService
                         if (!string.IsNullOrEmpty(patient.Phone))
                         {
                             recipient = patient.Phone;
-                            metadata["channel"] = "whatsapp";
+                            metadata = structured != null
+                                ? WhatsAppNotificationChannel.ToMetadata(structured)
+                                : new Dictionary<string, string> { ["channel"] = "whatsapp" };
                         }
                         break;
                     case NotificationChannel.SMS:
@@ -447,15 +522,17 @@ public class ReminderService : IReminderService
         // Create in-app notification
         var inAppNotification = new Notification
         {
-            UserId = patient.UserId,
+            // Patients without a portal account have no UserId; notifications.user_id is
+            // NOT NULL, so saving failed and aborted the whole reminder job.
+            UserId = patient.UserId ?? $"patient:{patient.Id}",
             ClinicId = patient.ClinicId,
             Title = subject,
             Message = message,
-            Type = appointment != null ? NotificationType.AppointmentReminder : NotificationType.General,
+            Type = type ?? (appointment != null ? NotificationType.AppointmentReminder : NotificationType.General),
             Channel = NotificationChannel.InApp,
             IsRead = false,
-            RelatedEntityId = appointment?.Id,
-            RelatedEntityType = "Appointment"
+            RelatedEntityId = relatedEntityId ?? appointment?.Id,
+            RelatedEntityType = relatedEntityType ?? (appointment != null ? "Appointment" : null)
         };
         inAppNotification.CreatedBy = "system";
         await _unitOfWork.Notifications.AddAsync(inAppNotification);

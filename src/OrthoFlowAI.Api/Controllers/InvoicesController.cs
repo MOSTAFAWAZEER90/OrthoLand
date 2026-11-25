@@ -5,6 +5,9 @@ using OrthoFlowAI.Application.DTOs;
 using OrthoFlowAI.Domain.Common;
 using OrthoFlowAI.Domain.Entities;
 using OrthoFlowAI.Domain.Enums;
+using Microsoft.EntityFrameworkCore;
+using OrthoFlowAI.Infrastructure.Data;
+using OrthoFlowAI.Infrastructure.Pdf;
 using OrthoFlowAI.Infrastructure.Services;
 
 namespace OrthoFlowAI.Api.Controllers;
@@ -15,12 +18,74 @@ namespace OrthoFlowAI.Api.Controllers;
 public class InvoicesController : ControllerBase
 {
     private readonly IInvoiceService _invoiceService;
+    private readonly IInstallmentService _installmentService;
+    private readonly ApplicationDbContext _db;
     private readonly ILogger<InvoicesController> _logger;
 
-    public InvoicesController(IInvoiceService invoiceService, ILogger<InvoicesController> logger)
+    public InvoicesController(IInvoiceService invoiceService, IInstallmentService installmentService,
+        ApplicationDbContext db, ILogger<InvoicesController> logger)
     {
         _invoiceService = invoiceService;
+        _installmentService = installmentService;
+        _db = db;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Download the invoice as PDF (Arabic RTL or English, by clinic language), including
+    /// the payments made and the instalment schedule.
+    /// </summary>
+    [HttpGet("{id}/pdf")]
+    [Produces("application/pdf")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DownloadPdf(string id)
+    {
+        // All queries go through the tenant filter: other clinics' invoices are not found.
+        var invoice = await _db.Invoices.AsNoTracking()
+            .Include(i => i.Patient)
+            .Include(i => i.Doctor).ThenInclude(d => d!.User)
+            .FirstOrDefaultAsync(i => i.Id == id);
+        if (invoice?.Patient is null)
+            return NotFound(ApiResponse.FailResponse("Invoice not found"));
+
+        var model = new InvoicePdfModel
+        {
+            Invoice = invoice,
+            Patient = invoice.Patient,
+            Clinic = await _db.Clinics.AsNoTracking().FirstOrDefaultAsync(c => c.Id == invoice.ClinicId),
+            DoctorName = invoice.Doctor?.User is { } u ? $"{u.FirstName} {u.LastName}" : null,
+            Payments = await _db.Payments.AsNoTracking().Where(p => p.InvoiceId == id).ToListAsync(),
+            Installments = await _db.Installments.AsNoTracking().Where(i => i.InvoiceId == id).ToListAsync(),
+        };
+
+        var bytes = InvoicePdfGenerator.Generate(model);
+        _logger.LogInformation("Generated PDF for invoice {InvoiceNumber} ({Bytes} bytes)", invoice.InvoiceNumber, bytes.Length);
+        return File(bytes, "application/pdf", $"invoice-{invoice.InvoiceNumber}.pdf");
+    }
+
+    /// <summary>Get the instalment plan (أقساط) of an invoice.</summary>
+    [HttpGet("{id}/installments")]
+    [ProducesResponseType(typeof(ApiResponse<InstallmentPlanResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetInstallments(string id)
+    {
+        var result = await _installmentService.GetPlanAsync(id);
+        return result.Success ? Ok(result) : NotFound(result);
+    }
+
+    /// <summary>
+    /// Split the invoice's remaining balance into instalments. Re-posting replaces the
+    /// unpaid instalments (paid ones are kept).
+    /// </summary>
+    [HttpPost("{id}/installments")]
+    [ProducesResponseType(typeof(ApiResponse<InstallmentPlanResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> CreateInstallments(string id, [FromBody] CreateInstallmentPlanRequest request)
+    {
+        _logger.LogInformation("Creating {Count} instalments for invoice {InvoiceId}", request.Count, id);
+        var result = await _installmentService.CreatePlanAsync(id, request);
+        return result.Success ? Ok(result) : BadRequest(result);
     }
 
     [HttpGet]

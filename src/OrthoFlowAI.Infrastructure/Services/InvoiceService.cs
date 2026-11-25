@@ -122,9 +122,35 @@ public class InvoiceService : IInvoiceService
             return ApiResponse<Payment>.FailResponse("Invoice not found.");
         }
 
+        if (payment.Amount <= 0)
+        {
+            return ApiResponse<Payment>.FailResponse("Payment amount must be greater than zero.");
+        }
+
+        var outstanding = InstallmentService.NetTotal(invoice) - invoice.PaidAmount;
+        if (payment.Amount > outstanding)
+        {
+            return ApiResponse<Payment>.FailResponse($"Payment exceeds the remaining balance ({outstanding:0.##}).");
+        }
+
         payment.CreatedAt = DateTime.UtcNow;
         payment.PaymentDate = DateTime.UtcNow;
+        payment.ClinicId = invoice.ClinicId;
+        if (string.IsNullOrEmpty(payment.PatientId)) payment.PatientId = invoice.PatientId;
         await _unitOfWork.Payments.AddAsync(payment);
+
+        // Settle instalments oldest-first, if this invoice is paid in instalments.
+        var installments = await _unitOfWork.Installments.Query()
+            .Where(i => i.InvoiceId == invoice.Id)
+            .OrderBy(i => i.Number)
+            .ToListAsync();
+        if (installments.Count > 0)
+        {
+            InstallmentService.AllocatePayment(installments, payment.Amount, payment.PaymentDate);
+            foreach (var inst in installments) _unitOfWork.Installments.Update(inst);
+            var next = installments.FirstOrDefault(i => i.Status != InstallmentStatus.Paid);
+            if (next != null) invoice.DueDate = next.DueDate;
+        }
 
         invoice.PaidAmount += payment.Amount;
         invoice.RemainingAmount = invoice.TotalAmount - invoice.PaidAmount - invoice.Discount + invoice.Tax;

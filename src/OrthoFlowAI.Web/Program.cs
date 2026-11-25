@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using MudBlazor.Services;
 using OrthoFlowAI.Application;
-using OrthoFlowAI.Infrastructure;
 using OrthoFlowAI.Web.Components;
 using OrthoFlowAI.Web.Services;
 
@@ -13,7 +12,9 @@ builder.Services.AddRazorComponents()
 builder.Services.AddMudServices();
 
 builder.Services.AddApplication();
-builder.Services.AddInfrastructure(builder.Configuration);
+// The Web is a pure API client (everything goes through IApiService). It must NOT
+// call AddInfrastructure: that registered a DbContext and a second Hangfire server,
+// so every scheduled reminder would have run twice (once here, once in the API).
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -40,6 +41,7 @@ builder.Services.AddHttpClient("OrthoFlowAI.Api", client =>
 });
 
 builder.Services.AddScoped<IApiService, ApiService>();
+builder.Services.AddScoped<PatientActions>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<AuthStateProvider>();
 builder.Services.AddScoped<Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider>(
