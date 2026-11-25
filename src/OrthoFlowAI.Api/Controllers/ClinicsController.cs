@@ -26,6 +26,7 @@ public class ClinicsController : ControllerBase
     /// Get all clinics with pagination
     /// </summary>
     [HttpGet]
+    [Authorize(Roles = "SuperAdmin")]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<Clinic>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20,
         [FromQuery] string? search = null, [FromQuery] bool? isActive = null)
@@ -43,6 +44,7 @@ public class ClinicsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(string id)
     {
+        if (!CanAccess(id)) return NotFound(ApiResponse.FailResponse("Clinic not found"));
         _logger.LogInformation("Getting clinic: {ClinicId}", id);
         var result = await _clinicService.GetByIdAsync(id);
 
@@ -58,6 +60,7 @@ public class ClinicsController : ControllerBase
     /// Create a new clinic
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "SuperAdmin")]
     [ProducesResponseType(typeof(ApiResponse<Clinic>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateClinicRequest request)
@@ -104,6 +107,7 @@ public class ClinicsController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Update(string id, [FromBody] UpdateClinicRequest request)
     {
+        if (!CanAccess(id)) return NotFound(ApiResponse.FailResponse("Clinic not found"));
         _logger.LogInformation("Updating clinic: {ClinicId}", id);
 
         var existing = await _clinicService.GetByIdAsync(id);
@@ -127,7 +131,8 @@ public class ClinicsController : ControllerBase
         if (request.PrimaryColor != null) clinic.PrimaryColor = request.PrimaryColor;
         if (request.SecondaryColor != null) clinic.SecondaryColor = request.SecondaryColor;
         if (request.Language != null) clinic.Language = request.Language;
-        if (request.IsActive.HasValue) clinic.IsActive = request.IsActive.Value;
+        // Only the platform admin may (de)activate a clinic.
+        if (request.IsActive.HasValue && User.IsInRole("SuperAdmin")) clinic.IsActive = request.IsActive.Value;
 
         clinic.UpdatedAt = DateTime.UtcNow;
         clinic.UpdatedBy = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -146,6 +151,7 @@ public class ClinicsController : ControllerBase
     /// Delete a clinic
     /// </summary>
     [HttpDelete("{id}")]
+    [Authorize(Roles = "SuperAdmin")]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(string id)
@@ -160,4 +166,19 @@ public class ClinicsController : ControllerBase
 
         return Ok(result);
     }
+
+    /// <summary>The caller's own clinic (used by the Settings page).</summary>
+    [HttpGet("current")]
+    public Task<IActionResult> GetCurrent() =>
+        CurrentClinicId is { } id ? GetById(id) : Task.FromResult<IActionResult>(NotFound(ApiResponse.FailResponse("No clinic for this user")));
+
+    /// <summary>Update the caller's own clinic profile, branding and hours.</summary>
+    [HttpPut("current")]
+    [Authorize(Roles = "SuperAdmin,ClinicOwner")]
+    public Task<IActionResult> UpdateCurrent([FromBody] UpdateClinicRequest request) =>
+        CurrentClinicId is { } id ? Update(id, request) : Task.FromResult<IActionResult>(NotFound(ApiResponse.FailResponse("No clinic for this user")));
+
+    private string? CurrentClinicId => HttpContext.Items["ClinicId"]?.ToString() is { Length: > 0 } c ? c : null;
+
+    private bool CanAccess(string clinicId) => User.IsInRole("SuperAdmin") || clinicId == CurrentClinicId;
 }

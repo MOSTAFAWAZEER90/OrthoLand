@@ -1,3 +1,4 @@
+using OrthoFlowAI.Infrastructure.Data;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -21,17 +22,20 @@ public class AuthService : IAuthService
     private readonly IUnitOfWork _unitOfWork;
     private readonly JwtSettings _jwtSettings;
     private readonly ILogger<AuthService> _logger;
+    private readonly ApplicationDbContext _db;
 
     public AuthService(
         ApplicationUserManager userManager,
         IUnitOfWork unitOfWork,
         IOptions<JwtSettings> jwtSettings,
-        ILogger<AuthService> logger)
+        ILogger<AuthService> logger,
+        ApplicationDbContext db)
     {
         _userManager = userManager;
         _unitOfWork = unitOfWork;
         _jwtSettings = jwtSettings.Value;
         _logger = logger;
+        _db = db;
     }
 
     public async Task<ApiResponse<AuthResult>> RegisterAsync(RegisterRequest request, string clinicId)
@@ -103,32 +107,59 @@ public class AuthService : IAuthService
         return ApiResponse<AuthResult>.SuccessResponse(token, "Login successful.");
     }
 
+    /// <summary>
+    /// Exchanges a stored, unexpired, unused refresh token for a new access + refresh token
+    /// (rotation). Presenting a token that was already used is treated as theft: all of
+    /// the user's sessions are revoked.
+    /// </summary>
     public async Task<ApiResponse<AuthResult>> RefreshTokenAsync(string refreshToken)
     {
-        var principal = GetPrincipalFromExpiredToken(refreshToken);
-        if (principal is null)
+        if (string.IsNullOrWhiteSpace(refreshToken))
+            return ApiResponse<AuthResult>.FailResponse("Invalid refresh token.");
+
+        var now = DateTime.UtcNow;
+        var hash = HashToken(refreshToken);
+        var stored = await _db.RefreshTokens.FirstOrDefaultAsync(t => t.TokenHash == hash);
+        if (stored is null)
+            return ApiResponse<AuthResult>.FailResponse("Invalid refresh token.");
+
+        if (stored.RevokedAt is not null)
         {
+            _logger.LogWarning("Reuse of a revoked refresh token for user {UserId}; revoking all sessions", stored.UserId);
+            await RevokeAllAsync(stored.UserId, now);
             return ApiResponse<AuthResult>.FailResponse("Invalid refresh token.");
         }
 
-        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrWhiteSpace(userId))
-        {
-            return ApiResponse<AuthResult>.FailResponse("Invalid token claims.");
-        }
+        if (stored.ExpiresAt <= now)
+            return ApiResponse<AuthResult>.FailResponse("Refresh token expired. Please log in again.");
 
-        var user = await _userManager.FindByIdAsync(userId);
+        var user = await _userManager.FindByIdAsync(stored.UserId);
         if (user is null || !user.IsActive)
-        {
             return ApiResponse<AuthResult>.FailResponse("User not found or deactivated.");
-        }
 
-        var token = await GenerateJwtTokenAsync(user);
-        return ApiResponse<AuthResult>.SuccessResponse(token, "Token refreshed successfully.");
+        var result = await GenerateJwtTokenAsync(user);
+        stored.RevokedAt = now;
+        stored.ReplacedByHash = HashToken(result.RefreshToken);
+        await _db.SaveChangesAsync();
+
+        return ApiResponse<AuthResult>.SuccessResponse(result, "Token refreshed successfully.");
     }
+
+    private async Task RevokeAllAsync(string userId, DateTime now)
+    {
+        var active = await _db.RefreshTokens.Where(t => t.UserId == userId && t.RevokedAt == null).ToListAsync();
+        foreach (var t in active) t.RevokedAt = now;
+        await _db.SaveChangesAsync();
+    }
+
+    internal static string HashToken(string token) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 
     public async Task<ApiResponse> LogoutAsync(string userId)
     {
+        // Logout now really ends the session: no refresh token of this user works any more.
+        await RevokeAllAsync(userId, DateTime.UtcNow);
+
         var user = await _userManager.FindByIdAsync(userId);
         if (user is not null)
         {
@@ -240,6 +271,13 @@ public class AuthService : IAuthService
         var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
 
         var refreshToken = GenerateRefreshToken();
+        _db.RefreshTokens.Add(new RefreshToken
+        {
+            UserId = user.Id,
+            TokenHash = HashToken(refreshToken),
+            ExpiresAt = DateTime.UtcNow.AddDays(_jwtSettings.RefreshExpirationInDays > 0 ? _jwtSettings.RefreshExpirationInDays : 7),
+        });
+        await _db.SaveChangesAsync();
 
         return new AuthResult
         {
@@ -267,34 +305,4 @@ public class AuthService : IAuthService
         return Convert.ToBase64String(randomBytes);
     }
 
-    private ClaimsPrincipal? GetPrincipalFromExpiredToken(string token)
-    {
-        var tokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.SecretKey)),
-            ValidIssuer = _jwtSettings.Issuer,
-            ValidAudience = _jwtSettings.Audience,
-            ValidateLifetime = false
-        };
-
-        var tokenHandler = new JwtSecurityTokenHandler();
-        try
-        {
-            var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out var securityToken);
-            if (securityToken is not JwtSecurityToken jwtToken ||
-                !jwtToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
-            {
-                return null;
-            }
-
-            return principal;
-        }
-        catch
-        {
-            return null;
-        }
-    }
 }

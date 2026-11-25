@@ -128,19 +128,19 @@ else
                                     <div>
                                         <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Total Cost</MudText>
                                         <MudText Typo="Typo.body2" Style="font-weight:700;color:var(--text-primary);">
-                                            $@_patient.TotalTreatmentCost.ToString("N0")
+                                            @_patient.TotalTreatmentCost.ToString("N0") ج.م
                                         </MudText>
                                     </div>
                                     <div>
                                         <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Paid</MudText>
                                         <MudText Typo="Typo.body2" Style="font-weight:700;color:var(--success);">
-                                            $@_patient.AmountPaid.ToString("N0")
+                                            @_patient.AmountPaid.ToString("N0") ج.م
                                         </MudText>
                                     </div>
                                     <div style="grid-column:span 2;">
                                         <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Remaining</MudText>
                                         <MudText Typo="Typo.body2" Style="font-weight:700;color:var(--danger);">
-                                            $@_patient.AmountRemaining.ToString("N0")
+                                            @_patient.AmountRemaining.ToString("N0") ج.م
                                         </MudText>
                                         @if (_patient.TotalTreatmentCost > 0)
                                         {

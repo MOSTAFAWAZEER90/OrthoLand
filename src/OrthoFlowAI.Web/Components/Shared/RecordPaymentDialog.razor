@@ -12,12 +12,12 @@
         <MudGrid>
             <MudItem xs="12">
                 <MudText Typo="Typo.body2" Style="color:var(--text-secondary);">
-                    Invoice: <strong>@InvoiceNumber</strong> | Remaining: <strong style="color:var(--danger);">$@RemainingAmount.ToString("N2")</strong>
+                    Invoice: <strong>@InvoiceNumber</strong> | Remaining: <strong style="color:var(--danger);">@RemainingAmount.ToString("N0") ج.م</strong>
                 </MudText>
             </MudItem>
             <MudItem xs="12" sm="6">
                 <MudNumericField @bind-Value="Model.Amount" Label="Amount" Required="true" Min="0.01m" Max="@RemainingAmount"
-                                 Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentText="$" />
+                                 Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentText="ج.م" />
             </MudItem>
             <MudItem xs="12" sm="6">
                 <MudSelect T="PaymentMethod" @bind-Value="Model.PaymentMethod" Label="Payment Method" Required="true"

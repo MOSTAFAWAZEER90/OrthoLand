@@ -11,7 +11,7 @@ using OrthoFlowAI.Infrastructure.Data;
 namespace OrthoFlowAI.Api.Controllers;
 
 [ApiController]
-[Route("api/super-admin/[controller]")]
+[Route("api/super-admin/clinics")] // the web calls this path; [controller] produced "SuperAdminClinics"
 [Authorize(Roles = "SuperAdmin")]
 public class SuperAdminClinicsController : ControllerBase
 {

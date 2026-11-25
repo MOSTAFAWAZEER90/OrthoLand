@@ -65,7 +65,12 @@ app.UseAntiforgery();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// The login (JWT) lives in the browser's sessionStorage, which the server cannot see on
+// the first HTTP request, so endpoint-level [Authorize] always redirected to /login (the
+// Portal and Super Admin pages never opened). Authorization is enforced by
+// AuthorizeRouteView in Routes.razor once the page is interactive; the API enforces it on data.
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+    .AddInteractiveServerRenderMode()
+    .AllowAnonymous();
 
 app.Run();

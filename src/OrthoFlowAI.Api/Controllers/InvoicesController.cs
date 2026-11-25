@@ -64,6 +64,45 @@ public class InvoicesController : ControllerBase
         return File(bytes, "application/pdf", $"invoice-{invoice.InvoiceNumber}.pdf");
     }
 
+    /// <summary>
+    /// The list page shows the patient's name; the raw entity has no such field, so map to
+    /// InvoiceResponse (PatientName/DoctorName) instead of returning the entity.
+    /// </summary>
+    private static ApiResponse<PagedResult<InvoiceResponse>> ToResponsePage(ApiResponse<PagedResult<Invoice>> result)
+    {
+        if (!result.Success || result.Data is null)
+            return ApiResponse<PagedResult<InvoiceResponse>>.FailResponse(result.Message, result.Errors);
+
+        var page = result.Data;
+        return ApiResponse<PagedResult<InvoiceResponse>>.SuccessResponse(new PagedResult<InvoiceResponse>
+        {
+            TotalCount = page.TotalCount,
+            PageNumber = page.PageNumber,
+            PageSize = page.PageSize,
+            Items = page.Items.Select(i => new InvoiceResponse
+            {
+                Id = i.Id,
+                InvoiceNumber = i.InvoiceNumber,
+                PatientId = i.PatientId,
+                PatientName = i.Patient is null ? string.Empty : $"{i.Patient.FirstName} {i.Patient.LastName}",
+                DoctorId = i.DoctorId,
+                DoctorName = i.Doctor?.User is { } u ? $"{u.FirstName} {u.LastName}" : null,
+                TotalAmount = i.TotalAmount,
+                PaidAmount = i.PaidAmount,
+                RemainingAmount = i.RemainingAmount,
+                Discount = i.Discount,
+                Tax = i.Tax,
+                Status = i.Status,
+                PaymentStatus = i.PaymentStatus,
+                DueDate = i.DueDate,
+                Notes = i.Notes,
+                ItemsJson = i.ItemsJson,
+                CreatedAt = i.CreatedAt,
+                UpdatedAt = i.UpdatedAt,
+            }).ToList(),
+        });
+    }
+
     /// <summary>Get the instalment plan (أقساط) of an invoice.</summary>
     [HttpGet("{id}/installments")]
     [ProducesResponseType(typeof(ApiResponse<InstallmentPlanResponse>), StatusCodes.Status200OK)]
@@ -96,7 +135,7 @@ public class InvoicesController : ControllerBase
         var result = await _invoiceService.GetAllAsync(
             filter.PageNumber, filter.PageSize, filter.PatientId, filter.Status,
             filter.PaymentStatus, filter.DueDateFrom, filter.DueDateTo);
-        return Ok(result);
+        return Ok(ToResponsePage(result));
     }
 
     [HttpPost("filter")]
@@ -107,7 +146,7 @@ public class InvoicesController : ControllerBase
         var result = await _invoiceService.GetAllAsync(
             filter.PageNumber, filter.PageSize, filter.PatientId, filter.Status,
             filter.PaymentStatus, filter.DueDateFrom, filter.DueDateTo);
-        return Ok(result);
+        return Ok(ToResponsePage(result));
     }
 
     [HttpGet("{id}")]

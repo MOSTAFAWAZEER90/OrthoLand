@@ -11,19 +11,18 @@
     <DialogContent>
         <MudGrid>
             <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="Model.PatientId" Label="Patient ID" Required="true"
-                              Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <LookupPicker Kind="patients" Label="المريض" Required="true" @bind-Value="Model.PatientId" />
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="Model.DoctorId" Label="Doctor ID" Required="true"
-                              Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <LookupPicker Kind="doctors" Label="الطبيب" Required="true" @bind-Value="Model.DoctorId" />
             </MudItem>
             <MudItem xs="12" sm="6">
                 <MudDatePicker @bind-Date="_appointmentDate" Label="Appointment Date" Required="true"
                                Variant="Variant.Outlined" Margin="Margin.Dense" />
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudTimePicker @bind-Time="_appointmentTime" Label="Time" Required="true"
+                @* Editable: the receptionist can type "14:30" instead of using the clock. *@
+                <MudTimePicker @bind-Time="_appointmentTime" Label="Time" Required="true" Editable="true"
                                Variant="Variant.Outlined" Margin="Margin.Dense" />
             </MudItem>
             <MudItem xs="12" sm="6">
@@ -76,7 +75,7 @@
     {
         if (string.IsNullOrWhiteSpace(Model.PatientId) || string.IsNullOrWhiteSpace(Model.DoctorId))
         {
-            Snackbar.Add("Patient ID and Doctor ID are required", Severity.Warning);
+            Snackbar.Add("اختار المريض والطبيب", Severity.Warning);
             return;
         }
 
@@ -123,7 +122,7 @@
                 }
                 else
                 {
-                    Snackbar.Add("Failed to create appointment", Severity.Error);
+                    Snackbar.Add(ApiService.LastErrorMessage ?? "Failed to create appointment", Severity.Error);
                 }
             }
         }

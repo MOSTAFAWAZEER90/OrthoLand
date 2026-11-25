@@ -7,9 +7,13 @@ public class DashboardResponse
     public int TotalPatients { get; set; }
     public int ActivePatients { get; set; }
     public int TodayAppointments { get; set; }
+    // The API sends these under different names (see DashboardService); map them.
+    [System.Text.Json.Serialization.JsonPropertyName("weekAppointments")]
     public int UpcomingAppointments { get; set; }
     public int MissedAppointments { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("monthRevenue")]
     public decimal MonthlyRevenue { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("pendingPayments")]
     public decimal OutstandingBalance { get; set; }
     public int CompletedTreatments { get; set; }
     public double TreatmentCompletionRate { get; set; }

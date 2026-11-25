@@ -11,24 +11,22 @@
     <DialogContent>
         <MudGrid>
             <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="Model.PatientId" Label="Patient ID" Required="true"
-                              Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <LookupPicker Kind="patients" Label="المريض" Required="true" @bind-Value="Model.PatientId" />
             </MudItem>
             <MudItem xs="12" sm="6">
-                <MudTextField @bind-Value="Model.DoctorId" Label="Doctor ID"
-                              Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <LookupPicker Kind="doctors" Label="الطبيب" Required="false" @bind-Value="Model.DoctorId" />
             </MudItem>
             <MudItem xs="12" sm="6">
                 <MudNumericField @bind-Value="Model.TotalAmount" Label="Total Amount" Required="true" Min="0.01m"
-                                 Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentText="$" />
+                                 Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentText="ج.م" />
             </MudItem>
             <MudItem xs="12" sm="6">
                 <MudNumericField @bind-Value="Model.Discount" Label="Discount" Min="0"
-                                 Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentText="$" />
+                                 Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentText="ج.م" />
             </MudItem>
             <MudItem xs="12" sm="6">
                 <MudNumericField @bind-Value="Model.Tax" Label="Tax" Min="0"
-                                 Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentText="$" />
+                                 Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentText="ج.م" />
             </MudItem>
             <MudItem xs="12" sm="6">
                 <MudDatePicker @bind-Date="Model.DueDate" Label="Due Date"
@@ -39,7 +37,7 @@
             </MudItem>
             <MudItem xs="12">
                 <MudText Typo="Typo.body2" Style="color:var(--text-secondary);font-weight:600;">
-                    Total: $@((Model.TotalAmount - Model.Discount + Model.Tax).ToString("N2"))
+                    الإجمالي: @((Model.TotalAmount - Model.Discount + Model.Tax).ToString("N0")) ج.م
                 </MudText>
             </MudItem>
         </MudGrid>
@@ -71,7 +69,7 @@
     {
         if (string.IsNullOrWhiteSpace(Model.PatientId) || Model.TotalAmount <= 0)
         {
-            Snackbar.Add("Patient ID and valid amount are required", Severity.Warning);
+            Snackbar.Add("اختار المريض واكتب المبلغ", Severity.Warning);
             return;
         }
 
@@ -88,7 +86,7 @@
             }
             else
             {
-                Snackbar.Add("Failed to create invoice", Severity.Error);
+                Snackbar.Add(ApiService.LastErrorMessage ?? "Failed to create invoice", Severity.Error);
             }
         }
         catch (Exception ex)

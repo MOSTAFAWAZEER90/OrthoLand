@@ -54,3 +54,13 @@ public class PaginatedApiResponse<T>
             Errors = errors ?? new()
         };
 }
+
+/// <summary>An id + display name pair for pickers (see /api/lookups).</summary>
+public class LookupItem
+{
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string? Detail { get; set; }
+
+    public override string ToString() => Name;
+}

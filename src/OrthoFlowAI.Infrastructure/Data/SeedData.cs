@@ -1208,7 +1208,7 @@ public static class SeedData
         await context.SaveChangesAsync();
     }
 
-    private static async Task CreateUserAsync(
+    internal static async Task CreateUserAsync(
         ApplicationDbContext context,
         UserManager<ApplicationUser> userManager,
         ApplicationUser user,

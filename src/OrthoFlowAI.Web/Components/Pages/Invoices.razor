@@ -109,17 +109,17 @@
             </MudTd>
             <MudTd>
                 <MudText Typo="Typo.body2" Style="font-weight:700;">
-                    $@context.TotalAmount.ToString("N2")
+                    @context.TotalAmount.ToString("N0") ج.م
                 </MudText>
             </MudTd>
             <MudTd>
                 <MudText Typo="Typo.body2" Style="color:var(--success);font-weight:600;">
-                    $@context.PaidAmount.ToString("N2")
+                    @context.PaidAmount.ToString("N0") ج.م
                 </MudText>
             </MudTd>
             <MudTd>
                 <MudText Typo="Typo.body2" Style="color:var(--danger);font-weight:600;">
-                    $@context.RemainingAmount.ToString("N2")
+                    @context.RemainingAmount.ToString("N0") ج.م
                 </MudText>
             </MudTd>
             <MudTd>

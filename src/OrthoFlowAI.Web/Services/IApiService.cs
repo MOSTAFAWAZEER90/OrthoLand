@@ -3,6 +3,8 @@ namespace OrthoFlowAI.Web.Services;
 public interface IApiService
 {
     Task<T?> GetAsync<T>(string endpoint, CancellationToken ct = default);
+    /// <summary>Reason the last POST failed, as reported by the API.</summary>
+    string? LastErrorMessage { get; }
     Task<T?> PostAsync<T>(string endpoint, object? data = null, CancellationToken ct = default);
     Task<T?> PutAsync<T>(string endpoint, object? data = null, CancellationToken ct = default);
     Task<T?> DeleteAsync<T>(string endpoint, CancellationToken ct = default);

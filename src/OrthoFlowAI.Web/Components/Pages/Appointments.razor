@@ -175,10 +175,9 @@ else
             {
                 PageNumber = 1,
                 PageSize = 200,
-                // PostgreSQL timestamptz only accepts UTC DateTimes (Kind=Unspecified was rejected,
-                // so this page never loaded any appointment). DateTo is inclusive of the last day.
-                DateFrom = new DateTime(_currentMonth.Year, _currentMonth.Month, 1, 0, 0, 0, DateTimeKind.Utc),
-                DateTo = new DateTime(_currentMonth.Year, _currentMonth.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(1).AddTicks(-1),
+                // Month boundaries in clinic time; ApiService converts them to UTC for the API.
+                DateFrom = new DateTime(_currentMonth.Year, _currentMonth.Month, 1),
+                DateTo = new DateTime(_currentMonth.Year, _currentMonth.Month, 1).AddMonths(1).AddTicks(-1),
                 Status = _statusFilter
             };
 

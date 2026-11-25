@@ -167,8 +167,15 @@ try
 
     // Several endpoints return EF entities whose navigations point back at each other
     // (Patient -> Doctor -> Patients -> ...), which made System.Text.Json throw mid-response.
-    builder.Services.AddControllers().AddJsonOptions(o =>
-        o.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles);
+    builder.Services.AddControllers(o => o.Filters.Add<PatientAccessFilter>()).AddJsonOptions(o =>
+    {
+        o.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        // Trim entities returned directly by endpoints (no nested lists, clinic record or secrets).
+        o.JsonSerializerOptions.TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver
+        {
+            Modifiers = { OrthoFlowAI.Api.Serialization.EntityJsonModifiers.Apply }
+        };
+    });
     builder.Services.AddEndpointsApiExplorer();
 
     builder.Services.AddSwaggerGen(options =>
@@ -223,6 +230,11 @@ try
         await roleManager.SeedRolesAsync();
         var seedOptions = configuration.GetSection(SeedOptions.SectionName).Get<SeedOptions>() ?? new SeedOptions();
         await SeedData.SeedAsync(dbContext, userManager, roleManager, seedOptions);
+        if (seedOptions.DemoData)
+        {
+            // Richer presentation data (more patients, instalments, a portal login, a 2nd clinic).
+            await DemoDataExtras.SeedAsync(dbContext, userManager, roleManager);
+        }
     }
 
 

@@ -56,7 +56,7 @@
             </MudTd>
             <MudTd DataLabel="Category">@context.Category</MudTd>
             <MudTd DataLabel="Brand">@(context.Brand ?? "—")</MudTd>
-            <MudTd DataLabel="Price">$@context.UnitPrice.ToString("N2")</MudTd>
+            <MudTd DataLabel="Price">@context.UnitPrice.ToString("N0") ج.م</MudTd>
             <MudTd DataLabel="In Stock">
                 <MudText Typo="Typo.body2" Style="font-weight:700;">@context.Quantity</MudText>
             </MudTd>

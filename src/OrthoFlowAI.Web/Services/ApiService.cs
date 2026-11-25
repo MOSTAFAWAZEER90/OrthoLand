@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
 namespace OrthoFlowAI.Web.Services;
@@ -11,17 +12,23 @@ public class ApiService : IApiService
     private readonly ILogger<ApiService> _logger;
     private readonly JsonSerializerOptions _jsonOptions;
     private readonly IJSRuntime _js;
+    private readonly NavigationManager? _navigation;
+    private readonly SemaphoreSlim _refreshLock = new(1, 1);
     private string? _authToken;
 
-    public ApiService(IHttpClientFactory httpClientFactory, ILogger<ApiService> logger, IJSRuntime js)
+    public ApiService(IHttpClientFactory httpClientFactory, ILogger<ApiService> logger, IJSRuntime js,
+        NavigationManager? navigation = null)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
         _js = js;
+        _navigation = navigation;
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            // Show and send times in clinic (Cairo) time; the API works in UTC.
+            Converters = { new ClinicTimeJsonConverter() }
         };
     }
 
@@ -113,6 +120,109 @@ public class ApiService : IApiService
         return false;
     }
 
+    /// <summary>
+    /// Sends a request with the access token. Access tokens live 60 minutes; on 401 the
+    /// stored refresh token is exchanged once for a new pair and the request retried.
+    /// If that fails the session is over, so the user is sent to the login page instead
+    /// of seeing empty screens.
+    /// </summary>
+    private async Task<HttpResponseMessage> SendAsync(Func<HttpClient, Task<HttpResponseMessage>> send)
+    {
+        var client = await CreateAuthorizedClientAsync();
+        var tokenUsed = _authToken;
+        var response = await send(client);
+        if (response.StatusCode != System.Net.HttpStatusCode.Unauthorized)
+            return response;
+
+        if (!string.IsNullOrEmpty(tokenUsed) && await TryRefreshAsync(tokenUsed))
+        {
+            response.Dispose();
+            return await send(CreateClient());
+        }
+
+        await EndSessionAsync();
+        return response;
+    }
+
+    private async Task<bool> TryRefreshAsync(string expiredToken)
+    {
+        await _refreshLock.WaitAsync();
+        try
+        {
+            // Another call on this circuit already refreshed while we waited.
+            if (!string.IsNullOrEmpty(_authToken) && _authToken != expiredToken) return true;
+
+            var refreshToken = await _js.InvokeAsync<string?>("sessionStorage.getItem", "refreshToken");
+            if (string.IsNullOrEmpty(refreshToken)) return false;
+
+            var response = await _httpClientFactory.CreateClient("OrthoFlowAI.Api")
+                .PostAsJsonAsync("api/auth/refresh", new { refreshToken });
+            if (!response.IsSuccessStatusCode) return false;
+
+            var json = JsonNode.Parse(await response.Content.ReadAsStringAsync());
+            var access = json?["data"]?["accessToken"]?.GetValue<string>();
+            var refresh = json?["data"]?["refreshToken"]?.GetValue<string>();
+            if (string.IsNullOrEmpty(access) || string.IsNullOrEmpty(refresh)) return false;
+
+            await _js.InvokeVoidAsync("sessionStorage.setItem", "authToken", access);
+            await _js.InvokeVoidAsync("sessionStorage.setItem", "refreshToken", refresh);
+            _authToken = access;
+            return true;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or JSException or HttpRequestException or JsonException)
+        {
+            _logger.LogWarning(ex, "Token refresh failed");
+            return false;
+        }
+        finally
+        {
+            _refreshLock.Release();
+        }
+    }
+
+    private async Task EndSessionAsync()
+    {
+        _authToken = null;
+        try
+        {
+            await _js.InvokeVoidAsync("sessionStorage.removeItem", "authToken");
+            await _js.InvokeVoidAsync("sessionStorage.removeItem", "refreshToken");
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or JSException) { }
+
+        if (_navigation != null && !_navigation.Uri.Contains("/login", StringComparison.OrdinalIgnoreCase))
+        {
+            var returnUrl = Uri.EscapeDataString(_navigation.ToBaseRelativePath(_navigation.Uri));
+            _navigation.NavigateTo($"/login?returnUrl=/{returnUrl}", forceLoad: true);
+        }
+    }
+
+    /// <summary>
+    /// The API's explanation for the last failed POST (e.g. "The selected time slot is
+    /// not available."), so dialogs can show the real reason instead of a generic error.
+    /// </summary>
+    public string? LastErrorMessage { get; private set; }
+
+    private static string? ExtractMessage(string body)
+    {
+        try
+        {
+            if (JsonNode.Parse(body) is not JsonObject o) return null;
+            var message = o["message"]?.GetValue<string>() ?? o["title"]?.GetValue<string>();
+            // Model validation errors: { errors: { Field: ["msg"] } }
+            if (o["errors"] is JsonObject fields)
+            {
+                var first = fields.Select(f => (f.Value as JsonArray)?.FirstOrDefault()?.GetValue<string>()).FirstOrDefault(m => m != null);
+                if (first != null) message = first;
+            }
+            return string.IsNullOrWhiteSpace(message) ? null : message;
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
     public void SetAuthorizationHeader(string token)
     {
         _authToken = token;
@@ -127,8 +237,7 @@ public class ApiService : IApiService
     {
         try
         {
-            var client = await CreateAuthorizedClientAsync();
-            var response = await client.GetAsync(endpoint, ct);
+            var response = await SendAsync(c => c.GetAsync(endpoint, ct));
 
             if (response.IsSuccessStatusCode)
             {
@@ -148,10 +257,10 @@ public class ApiService : IApiService
 
     public async Task<T?> PostAsync<T>(string endpoint, object? data = null, CancellationToken ct = default)
     {
+        LastErrorMessage = null;
         try
         {
-            var client = await CreateAuthorizedClientAsync();
-            var response = await client.PostAsJsonAsync(endpoint, data, _jsonOptions, ct);
+            var response = await SendAsync(c => c.PostAsJsonAsync(endpoint, data, _jsonOptions, ct));
 
             if (response.IsSuccessStatusCode)
             {
@@ -161,6 +270,7 @@ public class ApiService : IApiService
 
             var errorContent = await response.Content.ReadAsStringAsync(ct);
             _logger.LogWarning("API POST {Endpoint} returned {StatusCode}: {Error}", endpoint, response.StatusCode, errorContent);
+            LastErrorMessage = ExtractMessage(errorContent);
             return default;
         }
         catch (Exception ex)
@@ -174,8 +284,7 @@ public class ApiService : IApiService
     {
         try
         {
-            var client = await CreateAuthorizedClientAsync();
-            var response = await client.PutAsJsonAsync(endpoint, data, _jsonOptions, ct);
+            var response = await SendAsync(c => c.PutAsJsonAsync(endpoint, data, _jsonOptions, ct));
 
             if (response.IsSuccessStatusCode)
             {
@@ -197,8 +306,7 @@ public class ApiService : IApiService
     {
         try
         {
-            var client = await CreateAuthorizedClientAsync();
-            var response = await client.DeleteAsync(endpoint, ct);
+            var response = await SendAsync(c => c.DeleteAsync(endpoint, ct));
 
             if (response.IsSuccessStatusCode)
             {
@@ -274,8 +382,7 @@ public class ApiService : IApiService
     {
         try
         {
-            var client = await CreateAuthorizedClientAsync();
-            var response = await client.GetAsync(endpoint, ct);
+            var response = await SendAsync(c => c.GetAsync(endpoint, ct));
             if (response.IsSuccessStatusCode)
                 return await response.Content.ReadAsStreamAsync(ct);
 

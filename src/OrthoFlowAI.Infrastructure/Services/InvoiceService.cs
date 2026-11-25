@@ -38,12 +38,20 @@ public class InvoiceService : IInvoiceService
     {
         Expression<Func<Invoice, bool>>? filter = BuildFilter(patientId, status, paymentStatus, startDate, endDate);
 
-        var result = await _unitOfWork.Invoices.GetPagedAsync(
-            pageNumber,
-            pageSize,
-            filter,
-            q => q.OrderByDescending(i => i.CreatedAt));
+        var query = _unitOfWork.Invoices.Query()
+            .Include(i => i.Patient)
+            .Include(i => i.Doctor).ThenInclude(d => d!.User)
+            .AsQueryable();
+        if (filter != null) query = query.Where(filter);
 
+        var total = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(i => i.CreatedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        var result = new PagedResult<Invoice> { Items = items, TotalCount = total, PageNumber = pageNumber, PageSize = pageSize };
         return ApiResponse<PagedResult<Invoice>>.SuccessResponse(result);
     }
 

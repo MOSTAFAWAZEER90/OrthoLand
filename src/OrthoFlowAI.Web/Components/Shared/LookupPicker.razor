@@ -1,0 +1,67 @@
+@* Choose a patient or doctor by typing part of the name (instead of pasting an id). *@
+@inject IApiService ApiService
+
+<MudAutocomplete T="LookupItem"
+                 Label="@Label"
+                 Value="_selected"
+                 ValueChanged="OnSelected"
+                 SearchFunc="Search"
+                 ToStringFunc="@(i => i?.Name)"
+                 Required="Required"
+                 RequiredError="@($"اختار {Label}")"
+                 ResetValueOnEmptyText="true"
+                 CoerceText="true"
+                 DebounceInterval="250"
+                 Variant="Variant.Outlined"
+                 Margin="Margin.Dense">
+    <ItemTemplate Context="item">
+        <div>
+            <div>@item.Name</div>
+            @if (!string.IsNullOrWhiteSpace(item.Detail))
+            {
+                <div style="font-size:0.75rem;color:var(--text-tertiary);">@item.Detail</div>
+            }
+        </div>
+    </ItemTemplate>
+    <NoItemsTemplate>
+        <div style="padding:0.5rem;">مفيش نتايج</div>
+    </NoItemsTemplate>
+</MudAutocomplete>
+
+@code {
+    /// <summary>"patients" or "doctors".</summary>
+    [Parameter, EditorRequired] public string Kind { get; set; } = "patients";
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+
+    private LookupItem? _selected;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Show the name when the dialog opens with an id already set (e.g. from a patient profile).
+        if (!string.IsNullOrEmpty(Value) && _selected?.Id != Value)
+        {
+            var result = await ApiService.GetAsync<ApiResponse<List<LookupItem>>>($"api/lookups/{Kind}?id={Uri.EscapeDataString(Value)}");
+            _selected = result?.Data?.FirstOrDefault();
+        }
+        else if (string.IsNullOrEmpty(Value))
+        {
+            _selected = null;
+        }
+    }
+
+    private async Task<IEnumerable<LookupItem>> Search(string? text, CancellationToken ct)
+    {
+        var q = string.IsNullOrWhiteSpace(text) ? "" : $"?q={Uri.EscapeDataString(text)}";
+        var result = await ApiService.GetAsync<ApiResponse<List<LookupItem>>>($"api/lookups/{Kind}{q}", ct);
+        return result?.Data ?? new List<LookupItem>();
+    }
+
+    private async Task OnSelected(LookupItem? item)
+    {
+        _selected = item;
+        await ValueChanged.InvokeAsync(item?.Id);
+    }
+}

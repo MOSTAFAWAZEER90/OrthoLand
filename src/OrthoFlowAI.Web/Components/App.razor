@@ -1,4 +1,9 @@
-﻿<!DOCTYPE html>
+﻿@code {
+    // No prerendering: pages load data with the user's token, which only exists in the
+    // browser (sessionStorage). Prerendering ran every API call twice, the first always 401.
+    private static readonly IComponentRenderMode InteractiveNoPrerender = new InteractiveServerRenderMode(prerender: false);
+}
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -13,11 +18,11 @@
     <link rel="stylesheet" href="@Assets["css/mud-theme.css"]" />
     <link rel="stylesheet" href="@Assets["OrthoFlowAI.Web.styles.css"]" />
     <link rel="icon" type="image/png" href="favicon.png" />
-    <HeadOutlet @rendermode="InteractiveServer" />
+    <HeadOutlet @rendermode="InteractiveNoPrerender" />
 </head>
 
 <body class="mud-typography">
-    <Routes @rendermode="InteractiveServer" />
+    <Routes @rendermode="InteractiveNoPrerender" />
     <ReconnectModal />
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
