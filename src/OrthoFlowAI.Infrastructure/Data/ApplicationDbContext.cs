@@ -1000,6 +1000,22 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationIdentityUser>
             e.HasIndex(a => a.CreatedAt);
             e.HasIndex(a => a.IsDeleted);
         });
+
+        // SQL Server rejects tables reachable by more than one cascade-delete path
+        // (almost everything here points at Clinic, Patient and Doctor). Records are
+        // soft-deleted anyway, so let the database refuse hard deletes of referenced rows
+        // and have EF cascade only to tracked children. Identity tables keep their cascades.
+        foreach (var fk in builder.Model.GetEntityTypes()
+                     .Where(t => t.ClrType.Namespace == typeof(Clinic).Namespace || t.ClrType == typeof(RefreshToken))
+                     .SelectMany(t => t.GetForeignKeys()))
+        {
+            fk.DeleteBehavior = fk.DeleteBehavior switch
+            {
+                DeleteBehavior.Cascade => DeleteBehavior.ClientCascade,
+                DeleteBehavior.SetNull => DeleteBehavior.ClientSetNull,
+                var other => other,
+            };
+        }
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

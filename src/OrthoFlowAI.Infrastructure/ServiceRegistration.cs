@@ -1,6 +1,6 @@
 using System.Text;
 using Hangfire;
-using Hangfire.PostgreSql;
+using Hangfire.SqlServer;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -28,15 +28,15 @@ public static class ServiceRegistration
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseNpgsql(
+            options.UseSqlServer(
                 configuration.GetConnectionString("DefaultConnection"),
-                npgsqlOptions =>
+                sql =>
                 {
-                    npgsqlOptions.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName);
-                    npgsqlOptions.EnableRetryOnFailure(
+                    sql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName);
+                    sql.EnableRetryOnFailure(
                         maxRetryCount: 5,
                         maxRetryDelay: TimeSpan.FromSeconds(30),
-                        errorCodesToAdd: null);
+                        errorNumbersToAdd: null);
                 }));
 
         services.AddIdentity<ApplicationIdentityUser, IdentityRole>(options =>
@@ -89,7 +89,7 @@ public static class ServiceRegistration
         // Hangfire Configuration
         var hangfireConnectionString = configuration.GetConnectionString("DefaultConnection");
         services.AddHangfire(config =>
-            config.UsePostgreSqlStorage(hangfireConnectionString, new PostgreSqlStorageOptions
+            config.UseSqlServerStorage(hangfireConnectionString, new SqlServerStorageOptions
             {
                 QueuePollInterval = TimeSpan.FromSeconds(15),
                 JobExpirationCheckInterval = TimeSpan.FromHours(1),
