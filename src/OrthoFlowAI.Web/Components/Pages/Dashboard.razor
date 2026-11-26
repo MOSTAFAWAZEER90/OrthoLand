@@ -1,5 +1,4 @@
 @page "/dashboard"
-@rendermode InteractiveServer
 @inject IApiService ApiService
 @inject ISnackbar Snackbar
 
@@ -49,7 +48,7 @@ else
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
                 <StatCard Icon="@Icons.Material.Filled.AttachMoney"
-                          Value="@($"${_dashboard?.MonthlyRevenue:N0}" ?? "$0")"
+                          Value="@($"{_dashboard?.MonthlyRevenue ?? 0:N0} ج.م")"
                           Label="Monthly Revenue"
                           Color="success"
                           Trend="+8.2%"
@@ -159,7 +158,7 @@ else
                                     </div>
                                     <div style="text-align:right;">
                                         <MudText Typo="Typo.body2" Style="font-weight:600;color:var(--success);">
-                                            $@doctor.Revenue.ToString("N0")
+                                            @doctor.Revenue.ToString("N0") ج.م
                                         </MudText>
                                         <div style="display:flex;align-items:center;gap:2px;justify-content:flex-end;">
                                             <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Small" Style="color:var(--warning);font-size:0.875rem;" />

@@ -40,13 +40,13 @@
         <div style="padding:1rem;border-top:1px solid rgba(255,255,255,0.06);">
             <div style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem;border-radius:var(--radius-md);background:rgba(99,102,241,0.1);">
                 <MudAvatar Size="Size.Small" Style="background:var(--accent-gradient);color:white;font-weight:600;">
-                    DR
+                    @_initials
                 </MudAvatar>
                 <div style="flex:1;min-width:0;">
                     <MudText Style="color:white;font-weight:600;font-size:0.8125rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                        Dr. Admin
+                        @_name
                     </MudText>
-                    <MudText Style="color:rgba(255,255,255,0.4);font-size:0.6875rem;">Clinic Owner</MudText>
+                    <MudText Style="color:rgba(255,255,255,0.4);font-size:0.6875rem;">@_roleLabel</MudText>
                 </div>
             </div>
         </div>
@@ -80,12 +80,39 @@
         new("/super-admin", Icons.Material.Filled.Security, "Super Admin", NavLinkMatch.Prefix),
     };
 
+    // The card used to always say "Dr. Admin / Clinic Owner" whoever was logged in.
+    private string _name = "";
+    private string _initials = "";
+    private string _roleLabel = "";
+
     protected override async Task OnInitializedAsync()
     {
         var user = await AuthService.GetCurrentUserAsync();
-        if (user?.Role == UserRole.SuperAdmin)
+        if (user is null) return;
+
+        _name = $"{user.FirstName} {user.LastName}".Trim();
+        _initials = $"{user.FirstName.FirstOrDefault()}{user.LastName.FirstOrDefault()}".ToUpperInvariant();
+        _roleLabel = user.Role switch
         {
-            _navItems.AddRange(_adminNavItems);
+            UserRole.SuperAdmin => "System Admin",
+            UserRole.ClinicOwner => "Clinic Owner",
+            UserRole.Doctor => "Doctor",
+            UserRole.Receptionist => "Receptionist",
+            UserRole.Assistant => "Assistant",
+            UserRole.Patient => "Patient",
+            _ => user.Role.ToString(),
+        };
+
+        if (user.Role == UserRole.Patient)
+        {
+            // Patients only have their own portal; staff pages are not theirs.
+            _navItems = new() { new("/portal", Icons.Material.Filled.AccountCircle, "My Portal", NavLinkMatch.Prefix) };
+        }
+        else
+        {
+            // The "Patient Portal" page is the patient's own view; staff don't use it.
+            _navItems.RemoveAll(i => i.Href == "/portal");
+            if (user.Role == UserRole.SuperAdmin) _navItems.AddRange(_adminNavItems);
         }
     }
 

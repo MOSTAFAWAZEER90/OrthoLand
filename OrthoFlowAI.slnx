@@ -6,4 +6,7 @@
     <Project Path="src/OrthoFlowAI.Infrastructure/OrthoFlowAI.Infrastructure.csproj" />
     <Project Path="src/OrthoFlowAI.Web/OrthoFlowAI.Web.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OrthoFlowAI.Tests/OrthoFlowAI.Tests.csproj" />
+  </Folder>
 </Solution>

@@ -29,3 +29,14 @@ Thumbs.db
 
 ## Node (if any)
 node_modules/
+
+## Uploaded patient files (private storage) - never commit
+App_Data/
+**/wwwroot/uploads/
+
+## Local tools (portable PostgreSQL etc.)
+.local/
+
+## Deployment settings with secrets (connection string, JWT key) - never commit
+**/appsettings.Production.json
+**/PublishProfiles/*.pubxml

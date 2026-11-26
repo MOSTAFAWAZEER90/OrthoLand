@@ -7,6 +7,7 @@ using OrthoFlowAI.Domain.Common;
 using OrthoFlowAI.Domain.Entities;
 using OrthoFlowAI.Domain.Enums;
 using OrthoFlowAI.Domain.Interfaces;
+using OrthoFlowAI.Infrastructure.Services;
 
 namespace OrthoFlowAI.Api.Controllers;
 
@@ -17,11 +18,18 @@ public class StaffController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<StaffController> _logger;
+    private readonly IAuthService _authService;
 
-    public StaffController(IUnitOfWork unitOfWork, ILogger<StaffController> logger)
+    private static readonly HashSet<string> StaffRoles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        nameof(UserRole.Receptionist), nameof(UserRole.Assistant),
+    };
+
+    public StaffController(IUnitOfWork unitOfWork, ILogger<StaffController> logger, IAuthService authService)
     {
         _unitOfWork = unitOfWork;
         _logger = logger;
+        _authService = authService;
     }
 
     [HttpGet]
@@ -83,10 +91,37 @@ public class StaffController : ControllerBase
     {
         var clinicId = HttpContext.Items["ClinicId"]?.ToString() ?? string.Empty;
 
-        // Verify the referenced user belongs to this clinic
+        // The add-staff form had no way to give a name/email: create the employee's
+        // login here when no existing user is linked.
+        if (string.IsNullOrWhiteSpace(request.UserId))
+        {
+            if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.FirstName)
+                || string.IsNullOrWhiteSpace(request.Password))
+                return BadRequest(ApiResponse.FailResponse("Name, email and a temporary password are required."));
+
+            var role = string.IsNullOrWhiteSpace(request.Role) ? nameof(UserRole.Receptionist) : request.Role;
+            if (!StaffRoles.Contains(role))
+                return BadRequest(ApiResponse.FailResponse("Role must be Receptionist or Assistant."));
+
+            var registered = await _authService.RegisterAsync(new OrthoFlowAI.Infrastructure.Services.RegisterRequest
+            {
+                Email = request.Email.Trim(),
+                Password = request.Password,
+                FirstName = request.FirstName.Trim(),
+                LastName = request.LastName?.Trim() ?? string.Empty,
+                Phone = request.Phone,
+                Role = role,
+            }, clinicId);
+            if (!registered.Success || registered.Data is null)
+                return BadRequest(ApiResponse.FailResponse(registered.Errors.FirstOrDefault() ?? registered.Message));
+
+            request.UserId = registered.Data.User.Id;
+        }
+
+        // Verify the referenced user belongs to this clinic (the comment said so; the code didn't check).
         var users = await _unitOfWork.ApplicationUsers.FindAsync(u => u.Id == request.UserId);
         var linkedUser = users.FirstOrDefault();
-        if (linkedUser == null)
+        if (linkedUser == null || linkedUser.ClinicId != clinicId)
         {
             return BadRequest(ApiResponse.FailResponse("Linked user not found."));
         }

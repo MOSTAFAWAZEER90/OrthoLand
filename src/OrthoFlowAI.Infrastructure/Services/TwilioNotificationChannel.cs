@@ -19,7 +19,8 @@ public class TwilioNotificationChannel : INotificationChannel
     private readonly ILogger<TwilioNotificationChannel> _logger;
     private bool _initialized;
 
-    public NotificationChannel Channel => NotificationChannel.WhatsApp;
+    // WhatsApp is handled by WhatsAppNotificationChannel (Meta / Twilio / Log providers).
+    public NotificationChannel Channel => NotificationChannel.SMS;
 
     public TwilioNotificationChannel(IOptions<TwilioSettings> settings, ILogger<TwilioNotificationChannel> logger)
     {

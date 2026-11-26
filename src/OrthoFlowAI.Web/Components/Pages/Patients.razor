@@ -1,5 +1,4 @@
 @page "/patients"
-@rendermode InteractiveServer
 @inject IApiService ApiService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -112,7 +111,7 @@
             </MudTd>
             <MudTd>
                 <MudText Typo="Typo.body2" Style="font-weight:600;color:var(--danger);">
-                    @($"${context.AmountRemaining:N0}")
+                    @($"{context.AmountRemaining:N0} ج.م")
                 </MudText>
             </MudTd>
             <MudTd>
@@ -150,8 +149,18 @@
     private PatientStatus? _statusFilter;
     private TreatmentType? _treatmentFilter;
 
-    protected override async Task OnInitializedAsync()
+    /// <summary>Set by the top-bar search (navigates to /patients?search=...).</summary>
+    [SupplyParameterFromQuery(Name = "search")]
+    public string? SearchQuery { get; set; }
+    private string? _appliedSearch;
+    private bool _loaded;
+
+    protected override async Task OnParametersSetAsync()
     {
+        if (_loaded && SearchQuery == _appliedSearch) return;
+        _appliedSearch = SearchQuery;
+        _searchTerm = SearchQuery ?? "";
+        _loaded = true;
         await LoadPatients();
     }
 

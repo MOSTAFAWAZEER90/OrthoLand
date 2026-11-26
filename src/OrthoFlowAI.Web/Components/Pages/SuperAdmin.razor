@@ -1,6 +1,5 @@
 @page "/super-admin"
 @attribute [Authorize(Roles = "SuperAdmin")]
-@rendermode InteractiveServer
 @inject IApiService ApiService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
@@ -57,10 +56,10 @@ else
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
                 <StatCard Icon="@Icons.Material.Filled.AttachMoney"
-                          Value="@($"${_stats?.TotalRevenue:N0}" ?? "$0")"
+                          Value="@($"{_stats?.TotalRevenue:N0} ج.م" ?? "0 ج.م")"
                           Label="Total Revenue"
                           Color="warning"
-                          Trend="@($"${_stats?.MonthlyRevenue:N0}/mo")"
+                          Trend="@($"{_stats?.MonthlyRevenue:N0} ج.م/mo")"
                           TrendUp="true" />
             </MudItem>
         </MudGrid>
@@ -122,7 +121,7 @@ else
                                     <MudText Typo="Typo.body2">@context.TotalDoctors</MudText>
                                 </MudTd>
                                 <MudTd DataLabel="Revenue">
-                                    <MudText Typo="Typo.body2" Style="font-weight:600;color:var(--success);">$@context.TotalRevenue.ToString("N0")</MudText>
+                                    <MudText Typo="Typo.body2" Style="font-weight:600;color:var(--success);">@context.TotalRevenue.ToString("N0") ج.م</MudText>
                                 </MudTd>
                                 <MudTd DataLabel="Actions">
                                     <div style="display:flex;gap:0.25rem;">
@@ -189,7 +188,7 @@ else
                                         <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">@clinic.PatientCount patients</MudText>
                                     </div>
                                     <MudText Typo="Typo.body2" Style="font-weight:600;color:var(--success);">
-                                        $@clinic.Revenue.ToString("N0")
+                                        @clinic.Revenue.ToString("N0") ج.م
                                     </MudText>
                                 </div>
                             }

@@ -21,7 +21,7 @@ public class AppointmentService : IAppointmentService
         var appointments = await _unitOfWork.Appointments.FindAsync(
             a => a.Id == id,
             a => a.Patient!,
-            a => a.Doctor!,
+            a => a.Doctor!.User,
             a => a.Branch!);
 
         var appointment = appointments.FirstOrDefault();
@@ -43,7 +43,8 @@ public class AppointmentService : IAppointmentService
             pageNumber,
             pageSize,
             filter,
-            q => q.OrderByDescending(a => a.AppointmentDate));
+            q => q.OrderByDescending(a => a.AppointmentDate),
+            a => a.Patient, a => a.Doctor.User); // for PatientName / DoctorName
 
         return ApiResponse<PagedResult<Appointment>>.SuccessResponse(result);
     }
@@ -61,7 +62,7 @@ public class AppointmentService : IAppointmentService
                           a.DoctorId == doctorId;
         }
 
-        var appointments = await _unitOfWork.Appointments.FindAsync(filter);
+        var appointments = await _unitOfWork.Appointments.FindAsync(filter, a => a.Patient, a => a.Doctor.User);
         var sorted = appointments.OrderBy(a => a.AppointmentDate).ToList();
 
         return ApiResponse<List<Appointment>>.SuccessResponse(sorted);

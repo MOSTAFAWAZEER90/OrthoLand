@@ -26,7 +26,8 @@ public class AuthService : IAuthService
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
         };
     }
 
@@ -40,7 +41,7 @@ public class AuthService : IAuthService
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
-                var authResponse = JsonSerializer.Deserialize<AuthResponse>(content, _jsonOptions);
+                var authResponse = ParseLoginResponse(content);
 
                 if (authResponse?.Token != null)
                 {
@@ -62,6 +63,41 @@ public class AuthService : IAuthService
             _logger.LogError(ex, "Error during login");
             return null;
         }
+    }
+
+    /// <summary>
+    /// The API wraps the login result as { success, data: { accessToken, refreshToken,
+    /// expiresAt, user } }. The Web used to deserialize it as a flat AuthResponse with a
+    /// "token" field, so the token was always empty and login never succeeded.
+    /// </summary>
+    private AuthResponse? ParseLoginResponse(string content)
+    {
+        var envelope = JsonSerializer.Deserialize<LoginEnvelope>(content, _jsonOptions);
+        var data = envelope?.Data;
+        if (envelope?.Success != true || data == null || string.IsNullOrEmpty(data.AccessToken))
+            return null;
+
+        return new AuthResponse
+        {
+            Token = data.AccessToken,
+            RefreshToken = data.RefreshToken,
+            Expiration = data.ExpiresAt,
+            User = data.User ?? new AuthUserInfo()
+        };
+    }
+
+    private sealed class LoginEnvelope
+    {
+        public bool Success { get; set; }
+        public LoginData? Data { get; set; }
+    }
+
+    private sealed class LoginData
+    {
+        public string AccessToken { get; set; } = string.Empty;
+        public string RefreshToken { get; set; } = string.Empty;
+        public DateTime ExpiresAt { get; set; }
+        public AuthUserInfo? User { get; set; }
     }
 
     public async Task LogoutAsync()

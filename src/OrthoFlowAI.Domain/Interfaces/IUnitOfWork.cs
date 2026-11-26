@@ -16,6 +16,7 @@ public interface IUnitOfWork : IDisposable
     IRepository<Photo> Photos { get; }
     IRepository<Invoice> Invoices { get; }
     IRepository<Payment> Payments { get; }
+    IRepository<Installment> Installments { get; }
     IRepository<Document> Documents { get; }
     IRepository<Notification> Notifications { get; }
     IRepository<PainReport> PainReports { get; }

@@ -8,15 +8,32 @@ using ApplicationUser = OrthoFlowAI.Infrastructure.Identity.ApplicationIdentityU
 
 namespace OrthoFlowAI.Infrastructure.Data;
 
+/// <summary>Controls what <see cref="SeedData"/> creates.</summary>
+public sealed class SeedOptions
+{
+    public const string SectionName = "Seed";
+
+    /// <summary>Create the demo clinic, staff and patients (Development only).</summary>
+    public bool DemoData { get; set; }
+
+    public string SuperAdminEmail { get; set; } = "admin@orthoflow.ai";
+
+    /// <summary>
+    /// Password for the initial SuperAdmin. When empty, no SuperAdmin is created,
+    /// so production never ends up with a well-known default password.
+    /// </summary>
+    public string? SuperAdminPassword { get; set; }
+}
+
 public static class SeedData
 {
     public static async Task SeedAsync(
         ApplicationDbContext context,
         UserManager<ApplicationUser> userManager,
-        ApplicationRoleManager roleManager)
+        ApplicationRoleManager roleManager,
+        SeedOptions? options = null)
     {
-        if (await context.Clinics.AnyAsync())
-            return;
+        options ??= new SeedOptions();
 
         var now = DateTime.UtcNow;
 
@@ -47,25 +64,30 @@ public static class SeedData
             Id = superAdminUserId,
             FirstName = "System",
             LastName = "Administrator",
-            Email = "admin@orthoflow.ai",
-            UserName = "admin@orthoflow.ai",
+            Email = options.SuperAdminEmail,
+            UserName = options.SuperAdminEmail,
             PhoneNumber = "+201000000000",
             Role = UserRole.SuperAdmin.ToString(),
             IsActive = true,
             Language = Language.English.ToString(),
             CreatedAt = now,
-            NormalizedEmail = "ADMIN@ORTHOFLOW.AI",
-            NormalizedUserName = "ADMIN@ORTHOFLOW.AI",
+            NormalizedEmail = options.SuperAdminEmail.ToUpperInvariant(),
+            NormalizedUserName = options.SuperAdminEmail.ToUpperInvariant(),
             EmailConfirmed = true,
             PhoneNumberConfirmed = true,
             SecurityStamp = Guid.NewGuid().ToString()
         };
 
-        if (await userManager.FindByEmailAsync(superAdmin.Email) is null)
+        if (!string.IsNullOrWhiteSpace(options.SuperAdminPassword)
+            && await userManager.FindByEmailAsync(superAdmin.Email) is null)
         {
-            await CreateUserAsync(userManager, superAdmin, "Admin@123");
+            await CreateUserAsync(context, userManager, superAdmin, options.SuperAdminPassword);
             await roleManager.AssignUserRoleAsync(superAdmin.Id, UserRole.SuperAdmin.ToString());
         }
+
+        // Everything below is demo data with well-known passwords: Development only.
+        if (!options.DemoData || await context.Clinics.AnyAsync())
+            return;
 
         // ── 2. Demo Clinic ─────────────────────────────────────────────────
         var clinic = new Clinic
@@ -131,7 +153,7 @@ public static class SeedData
 
         if (await userManager.FindByEmailAsync(ownerIdentity.Email) is null)
         {
-            await CreateUserAsync(userManager, ownerIdentity, "Owner@123");
+            await CreateUserAsync(context, userManager, ownerIdentity, "Owner@123");
             await roleManager.AssignUserRoleAsync(ownerIdentity.Id, UserRole.ClinicOwner.ToString());
         }
 
@@ -159,7 +181,7 @@ public static class SeedData
 
         if (await userManager.FindByEmailAsync(doctor1User.Email) is null)
         {
-            await CreateUserAsync(userManager, doctor1User, "Doctor@123");
+            await CreateUserAsync(context, userManager, doctor1User, "Doctor@123");
             await roleManager.AssignUserRoleAsync(doctor1User.Id, UserRole.Doctor.ToString());
         }
 
@@ -202,7 +224,7 @@ public static class SeedData
 
         if (await userManager.FindByEmailAsync(doctor2User.Email) is null)
         {
-            await CreateUserAsync(userManager, doctor2User, "Doctor@123");
+            await CreateUserAsync(context, userManager, doctor2User, "Doctor@123");
             await roleManager.AssignUserRoleAsync(doctor2User.Id, UserRole.Doctor.ToString());
         }
 
@@ -245,7 +267,7 @@ public static class SeedData
 
         if (await userManager.FindByEmailAsync(receptionistUser.Email) is null)
         {
-            await CreateUserAsync(userManager, receptionistUser, "Staff@123");
+            await CreateUserAsync(context, userManager, receptionistUser, "Staff@123");
             await roleManager.AssignUserRoleAsync(receptionistUser.Id, UserRole.Receptionist.ToString());
         }
 
@@ -1186,12 +1208,13 @@ public static class SeedData
         await context.SaveChangesAsync();
     }
 
-    private static async Task CreateUserAsync(
+    internal static async Task CreateUserAsync(
+        ApplicationDbContext context,
         UserManager<ApplicationUser> userManager,
         ApplicationUser user,
         string password)
     {
-        var existing = await userManager.FindByEmailAsync(user.Email);
+        var existing = await userManager.FindByEmailAsync(user.Email!);
         if (existing is not null)
             return;
 
@@ -1202,5 +1225,22 @@ public static class SeedData
                 $"Failed to create user {user.Email}: " +
                 string.Join("; ", result.Errors.Select(e => e.Description)));
         }
+
+        // Doctors, staff etc. reference the domain user table (application_users),
+        // not the Identity table, so mirror the account there like AuthService.RegisterAsync does.
+        context.ApplicationUsers.Add(new Domain.Entities.ApplicationUser
+        {
+            Id = user.Id,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Phone = user.PhoneNumber,
+            Role = Enum.Parse<UserRole>(user.Role),
+            ClinicId = user.ClinicId,
+            BranchId = user.BranchId,
+            IsActive = user.IsActive,
+            Language = Enum.TryParse<Language>(user.Language, out var lang) ? lang : null,
+            CreatedAt = user.CreatedAt
+        });
+        await context.SaveChangesAsync();
     }
 }

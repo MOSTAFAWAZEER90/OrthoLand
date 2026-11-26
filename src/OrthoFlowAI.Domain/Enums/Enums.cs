@@ -266,3 +266,11 @@ public enum DocumentStatus
     Revoked,
     Rejected
 }
+
+public enum InstallmentStatus
+{
+    Pending,
+    PartiallyPaid,
+    Paid,
+    Overdue
+}

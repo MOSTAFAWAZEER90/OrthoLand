@@ -1,6 +1,5 @@
 @page "/portal"
 @attribute [Authorize]
-@rendermode InteractiveServer
 @inject IApiService ApiService
 @inject IAuthService AuthService
 @inject ISnackbar Snackbar
@@ -61,7 +60,7 @@ else
         </MudCard>
         <MudCard Class="content-card">
             <MudCardContent>
-                <MudText Typo="Typo.body2" Style="font-weight:700;color:var(--warning);font-size:1.5rem;">$@_summary.Stats.OutstandingBalance.ToString("N0")</MudText>
+                <MudText Typo="Typo.body2" Style="font-weight:700;color:var(--warning);font-size:1.5rem;">@_summary.Stats.OutstandingBalance.ToString("N0") ج.م</MudText>
                 <MudText Typo="Typo.caption" Style="color:var(--text-tertiary);">Outstanding Balance</MudText>
             </MudCardContent>
         </MudCard>
@@ -219,9 +218,9 @@ else
                             {
                                 <tr>
                                     <td>@inv.CreatedAt.ToString("MMM dd, yyyy")</td>
-                                    <td>$@inv.TotalAmount.ToString("N0")</td>
-                                    <td style="color:var(--success);">$@inv.PaidAmount.ToString("N0")</td>
-                                    <td style="color:var(--danger);font-weight:600;">$@inv.Balance.ToString("N0")</td>
+                                    <td>@inv.TotalAmount.ToString("N0") ج.م</td>
+                                    <td style="color:var(--success);">@inv.PaidAmount.ToString("N0") ج.م</td>
+                                    <td style="color:var(--danger);font-weight:600;">@inv.Balance.ToString("N0") ج.م</td>
                                     <td><MudChip T="string" Style="@GetPayStyle(inv.PaymentStatus)">@inv.PaymentStatus</MudChip></td>
                                 </tr>
                             }

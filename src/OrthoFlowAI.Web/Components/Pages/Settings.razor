@@ -1,6 +1,6 @@
 @page "/settings"
-@rendermode InteractiveServer
 @inject ISnackbar Snackbar
+@inject IApiService ApiService
 
 <PageTitle>Settings - OrthoFlowAI</PageTitle>
 
@@ -72,10 +72,6 @@
                             <MudTextField @bind-Value="_clinicAddress" Label="Address"
                                           Variant="Variant.Outlined" FullWidth="true" Lines="2" />
                         </MudItem>
-                        <MudItem xs="12">
-                            <MudTextField @bind-Value="_clinicDescription" Label="Description"
-                                          Variant="Variant.Outlined" FullWidth="true" Lines="3" />
-                        </MudItem>
                     </MudGrid>
                     <div style="margin-top:1.5rem;display:flex;justify-content:flex-end;">
                         <MudButton Variant="Variant.Filled" Style="color:white;"
@@ -104,15 +100,6 @@
                                          @onclick="@(() => _selectedBrandColor = color)"></div>
                                 }
                             </div>
-                        </MudItem>
-                        <MudItem xs="12" sm="6">
-                            <MudSelect T="string" @bind-Value="_brandFont" Label="Font Family"
-                                       Variant="Variant.Outlined" FullWidth="true">
-                                <MudSelectItem Value="@("Inter")">Inter</MudSelectItem>
-                                <MudSelectItem Value="@("Poppins")">Poppins</MudSelectItem>
-                                <MudSelectItem Value="@("Roboto")">Roboto</MudSelectItem>
-                                <MudSelectItem Value="@("Open Sans")">Open Sans</MudSelectItem>
-                            </MudSelect>
                         </MudItem>
                     </MudGrid>
                     <div style="margin-top:1.5rem;display:flex;justify-content:flex-end;">
@@ -235,15 +222,14 @@
 @code {
     private int ActiveSection = 0;
 
-    private string _clinicName = "OrthoFlowAI Clinic";
-    private string _clinicEmail = "info@orthoflowai.com";
-    private string _clinicPhone = "+1 (555) 123-4567";
-    private string _clinicWebsite = "https://orthoflowai.com";
-    private string _clinicAddress = "123 Dental Avenue, Suite 100";
-    private string _clinicDescription = "Modern orthodontic practice providing quality dental care.";
+    // Loaded from /api/clinics/current (these used to be hard-coded sample values).
+    private string _clinicName = "";
+    private string _clinicEmail = "";
+    private string _clinicPhone = "";
+    private string _clinicWebsite = "";
+    private string _clinicAddress = "";
 
     private string _selectedBrandColor = "#6366f1";
-    private string _brandFont = "Inter";
     private List<string> _brandColors = new() { "#6366f1", "#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#06b6d4" };
 
     private bool _notifReminders = true;
@@ -257,32 +243,114 @@
 
     private List<BusinessHour> _businessHours = new()
     {
+        new("Saturday", true, new TimeSpan(9, 0, 0), new TimeSpan(17, 0, 0)),
+        new("Sunday", true, new TimeSpan(9, 0, 0), new TimeSpan(17, 0, 0)),
         new("Monday", true, new TimeSpan(9, 0, 0), new TimeSpan(17, 0, 0)),
         new("Tuesday", true, new TimeSpan(9, 0, 0), new TimeSpan(17, 0, 0)),
         new("Wednesday", true, new TimeSpan(9, 0, 0), new TimeSpan(17, 0, 0)),
         new("Thursday", true, new TimeSpan(9, 0, 0), new TimeSpan(17, 0, 0)),
-        new("Friday", true, new TimeSpan(9, 0, 0), new TimeSpan(15, 0, 0)),
-        new("Saturday", false, new TimeSpan(9, 0, 0), new TimeSpan(13, 0, 0)),
-        new("Sunday", false, new TimeSpan(0, 0, 0), new TimeSpan(0, 0, 0)),
+        new("Friday", false, new TimeSpan(9, 0, 0), new TimeSpan(13, 0, 0)),
     };
 
-    private void SaveClinicProfile() => Snackbar.Add("Clinic profile saved successfully!", Severity.Success);
-    private void SaveBranding() => Snackbar.Add("Branding settings saved!", Severity.Success);
-    private void SaveBusinessHours() => Snackbar.Add("Business hours saved!", Severity.Success);
-    private void SaveNotifications() => Snackbar.Add("Notification preferences saved!", Severity.Success);
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await ApiService.GetAsync<ApiResponse<ClinicResponse>>("api/clinics/current");
+        var c = result?.Data;
+        if (c is null)
+        {
+            Snackbar.Add("تعذّر تحميل بيانات العيادة", Severity.Warning);
+            return;
+        }
 
-    private void ChangePassword()
+        _clinicName = c.Name;
+        _clinicEmail = c.Email ?? "";
+        _clinicPhone = c.Phone ?? "";
+        _clinicWebsite = c.Website ?? "";
+        _clinicAddress = c.Address ?? "";
+        if (!string.IsNullOrWhiteSpace(c.PrimaryColor)) _selectedBrandColor = c.PrimaryColor;
+        LoadHours(c.WorkingDays, c.BusinessHours);
+    }
+
+    private Task SaveClinicProfile() => SaveAsync(new UpdateClinicRequest
+    {
+        Name = _clinicName,
+        Email = _clinicEmail,
+        Phone = _clinicPhone,
+        Website = _clinicWebsite,
+        Address = _clinicAddress,
+    }, "تم حفظ بيانات العيادة");
+
+    private Task SaveBranding() => SaveAsync(new UpdateClinicRequest { PrimaryColor = _selectedBrandColor }, "تم حفظ لون العيادة");
+
+    private Task SaveBusinessHours()
+    {
+        var open = _businessHours.Where(d => d.IsEnabled).ToList();
+        return SaveAsync(new UpdateClinicRequest
+        {
+            WorkingDays = string.Join(",", open.Select(d => d.Day[..3])),
+            BusinessHours = string.Join(";", open.Select(d => $"{d.Day[..3]}={Hhmm(d.OpenTime)}-{Hhmm(d.CloseTime)}")),
+        }, "تم حفظ مواعيد العمل");
+    }
+
+    // No storage for notification preferences yet: say so instead of pretending to save.
+    private void SaveNotifications() => Snackbar.Add("إعدادات الإشعارات لسه مش متاحة للحفظ", Severity.Info);
+
+    private async Task SaveAsync(UpdateClinicRequest request, string success)
+    {
+        var result = await ApiService.PutAsync<ApiResponse<ClinicResponse>>("api/clinics/current", request);
+        if (result?.Success == true) Snackbar.Add(success, Severity.Success);
+        else Snackbar.Add(result?.Message ?? "الحفظ فشل", Severity.Error);
+    }
+
+    private async Task ChangePassword()
     {
         if (string.IsNullOrEmpty(_newPassword) || _newPassword != _confirmPassword)
         {
-            Snackbar.Add("Passwords do not match", Severity.Error);
+            Snackbar.Add("الباسورد الجديد مش متطابق", Severity.Error);
             return;
         }
-        Snackbar.Add("Password changed successfully!", Severity.Success);
-        _currentPassword = "";
-        _newPassword = "";
-        _confirmPassword = "";
+        var result = await ApiService.PostAsync<ApiResponse>("api/auth/change-password", new ChangePasswordRequest
+        {
+            CurrentPassword = _currentPassword,
+            NewPassword = _newPassword,
+            ConfirmNewPassword = _confirmPassword,
+        });
+        if (result?.Success == true)
+        {
+            Snackbar.Add("تم تغيير الباسورد", Severity.Success);
+            _currentPassword = _newPassword = _confirmPassword = "";
+        }
+        else
+        {
+            Snackbar.Add(ApiService.LastErrorMessage ?? result?.Message ?? "تغيير الباسورد فشل", Severity.Error);
+        }
     }
+
+    /// <summary>Reads "Sat=09:00-17:00;Sun=..." (or the older single "09:00-17:00" for all working days).</summary>
+    private void LoadHours(string? workingDays, string? businessHours)
+    {
+        var days = (workingDays ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var perDay = (businessHours ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries)
+            .Select(x => x.Split('='))
+            .Where(x => x.Length == 2)
+            .ToDictionary(x => x[0].Trim(), x => x[1].Trim(), StringComparer.OrdinalIgnoreCase);
+        var shared = businessHours != null && !businessHours.Contains('=') ? businessHours : null;
+
+        foreach (var d in _businessHours)
+        {
+            var key = d.Day[..3];
+            if (days.Length > 0) d.IsEnabled = days.Contains(key, StringComparer.OrdinalIgnoreCase);
+            var range = perDay.TryGetValue(key, out var r) ? r : shared;
+            var parts = range?.Split('-');
+            if (parts is { Length: 2 } && TimeSpan.TryParse(parts[0], out var o) && TimeSpan.TryParse(parts[1], out var cl))
+            {
+                d.OpenTime = o;
+                d.CloseTime = cl;
+            }
+        }
+    }
+
+    private static string Hhmm(TimeSpan? t) => (t ?? TimeSpan.Zero).ToString(@"hh\:mm");
 
     class BusinessHour
     {

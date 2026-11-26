@@ -47,7 +47,18 @@ public class StaffResponse
 
 public class StaffDto
 {
+    /// <summary>Existing user to link. Leave empty to create a new account from the fields below.</summary>
     public string UserId { get; set; } = string.Empty;
+
+    // New account (used when UserId is empty)
+    public string? FirstName { get; set; }
+    public string? LastName { get; set; }
+    public string? Email { get; set; }
+    public string? Phone { get; set; }
+    /// <summary>"Receptionist" or "Assistant".</summary>
+    public string? Role { get; set; }
+    public string? Password { get; set; }
+
     public string? Position { get; set; }
     public string? Department { get; set; }
     public StaffStatus Status { get; set; } = StaffStatus.Active;

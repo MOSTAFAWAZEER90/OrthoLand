@@ -44,7 +44,8 @@ public class NotificationsController : ControllerBase
         [FromQuery] NotificationChannel? channel = null)
     {
         var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var targetUserId = userId ?? currentUserId;
+        // Only the platform admin may look at another user's notifications.
+        var targetUserId = User.IsInRole("SuperAdmin") ? userId ?? currentUserId : currentUserId;
 
         _logger.LogInformation("Getting notifications for user {UserId}, page {PageNumber}", targetUserId, pageNumber);
 

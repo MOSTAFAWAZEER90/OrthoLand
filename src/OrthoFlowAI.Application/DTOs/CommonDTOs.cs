@@ -7,7 +7,9 @@ public class PaginationRequest
     [Range(1, int.MaxValue)]
     public int PageNumber { get; set; } = 1;
 
-    [Range(1, 100)]
+    // The web UI loads full lists (photos, branches, staff) with pageSize=200, which the
+    // old limit of 100 rejected with 400, leaving those screens empty.
+    [Range(1, 500)]
     public int PageSize { get; set; } = 20;
 
     [MaxLength(500)]
@@ -51,4 +53,14 @@ public class PaginatedApiResponse<T>
             Message = message,
             Errors = errors ?? new()
         };
+}
+
+/// <summary>An id + display name pair for pickers (see /api/lookups).</summary>
+public class LookupItem
+{
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string? Detail { get; set; }
+
+    public override string ToString() => Name;
 }

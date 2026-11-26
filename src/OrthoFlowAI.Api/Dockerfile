@@ -11,6 +11,8 @@ COPY src/ src/
 RUN dotnet publish src/OrthoFlowAI.Api/OrthoFlowAI.Api.csproj -c Release -o /app/publish --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+# Arabic-capable fonts for PDF invoices (QuestPDF uses system fonts).
+RUN apt-get update     && apt-get install -y --no-install-recommends fonts-noto-core     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 EXPOSE 8080
 

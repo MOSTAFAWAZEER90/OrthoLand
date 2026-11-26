@@ -21,6 +21,11 @@ services:
       - Jwt__Audience=${JWT_AUDIENCE}
       - SendGrid__ApiKey=${SENDGRID_API_KEY}
       - OpenAI__ApiKey=${OPENAI_API_KEY}
+      - Seed__SuperAdminEmail=${SUPERADMIN_EMAIL:-admin@orthoflow.ai}
+      - Seed__SuperAdminPassword=${SUPERADMIN_PASSWORD:-}
+      - Storage__RootPath=/app/data/files
+    volumes:
+      - api-files:/app/data/files
     networks:
       - orthoflow-network
 
@@ -36,7 +41,7 @@ services:
       - orthoflow-api
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - Api__BaseUrl=http://orthoflow-api:8080
+      - ApiSettings__BaseUrl=http://orthoflow-api:8080/
     networks:
       - orthoflow-network
 
@@ -44,8 +49,8 @@ services:
     image: postgres:16-alpine
     container_name: orthoflow-postgres
     restart: unless-stopped
-    ports:
-      - "5432:5432"
+    # No host port in production: the database is only reachable inside the
+    # compose network. docker-compose.override.yml publishes it for local dev.
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -65,8 +70,6 @@ services:
     image: redis:7-alpine
     container_name: orthoflow-redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -82,6 +85,8 @@ volumes:
   postgres-data:
     driver: local
   redis-data:
+    driver: local
+  api-files:
     driver: local
 
 networks:

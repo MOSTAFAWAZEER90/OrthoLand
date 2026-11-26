@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using OrthoFlowAI.Api.Storage;
 using OrthoFlowAI.Application.DTOs;
 using OrthoFlowAI.Domain.Common;
 using OrthoFlowAI.Domain.Entities;
@@ -17,13 +18,26 @@ public class PhotosController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<PhotosController> _logger;
-    private readonly IWebHostEnvironment _env;
+    private readonly PrivateFileStore _files;
+    private readonly SignedFileUrlService _signer;
 
-    public PhotosController(IUnitOfWork unitOfWork, ILogger<PhotosController> logger, IWebHostEnvironment env)
+    internal static readonly IReadOnlyDictionary<string, string> AllowedImageTypes =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [".jpg"] = "image/jpeg",
+            [".jpeg"] = "image/jpeg",
+            [".png"] = "image/png",
+            [".webp"] = "image/webp",
+            [".gif"] = "image/gif",
+        };
+
+    public PhotosController(IUnitOfWork unitOfWork, ILogger<PhotosController> logger,
+        PrivateFileStore files, SignedFileUrlService signer)
     {
         _unitOfWork = unitOfWork;
         _logger = logger;
-        _env = env;
+        _files = files;
+        _signer = signer;
     }
 
     /// <summary>
@@ -90,14 +104,21 @@ public class PhotosController : ControllerBase
     }
 
     /// <summary>
-    /// Serve the actual image file for a photo
+    /// Serve the actual image file for a photo. Anonymous because img tags cannot
+    /// send a bearer token, but it requires the short-lived signature that only an
+    /// authorized photo listing hands out.
     /// </summary>
     [HttpGet("{id}/file")]
     [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetFile(string id)
+    public async Task<IActionResult> GetFile(string id, [FromQuery] long expires, [FromQuery] string? sig)
     {
+        if (!_signer.IsValid("photos", id, expires, sig))
+        {
+            return NotFound();
+        }
+
         var photo = await _unitOfWork.Photos.GetByIdAsync(id);
         if (photo == null || photo.IsDeleted)
         {
@@ -109,16 +130,21 @@ public class PhotosController : ControllerBase
             return NotFound();
         }
 
-        var root = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-        var filePath = Path.Combine(root, photo.Url.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
-
-        if (!System.IO.File.Exists(filePath))
+        var filePath = _files.ResolvePath(photo.Url);
+        if (filePath == null || !System.IO.File.Exists(filePath))
         {
             return NotFound();
         }
 
+        // Never trust the stored (client-supplied) content type: serving e.g.
+        // text/html from the API origin would allow stored XSS.
+        var contentType = AllowedImageTypes.TryGetValue(Path.GetExtension(filePath), out var ct)
+            ? ct
+            : "application/octet-stream";
+
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers["Cache-Control"] = "private, max-age=300";
         var stream = System.IO.File.OpenRead(filePath);
-        var contentType = photo.FileType ?? "application/octet-stream";
         return File(stream, contentType);
     }
 
@@ -157,26 +183,22 @@ public class PhotosController : ControllerBase
             var extension = Path.GetExtension(file.FileName);
             if (string.IsNullOrEmpty(extension))
             {
-                extension = guessExtension(fileType);
+                extension = guessExtension(file.ContentType ?? fileType);
             }
 
-            var safeName = $"{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
-            var clinicId = HttpContext.Items["ClinicId"]?.ToString() ?? "default";
-            var relativeFolder = $"uploads/photos/{clinicId}";
-
-            var root = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
-            var folder = Path.Combine(root, relativeFolder);
-            Directory.CreateDirectory(folder);
-
-            var filePath = Path.Combine(folder, safeName);
-            await using (var stream = System.IO.File.Create(filePath))
+            if (!AllowedImageTypes.TryGetValue(extension, out var normalizedType))
             {
-                await file.CopyToAsync(stream);
+                return BadRequest(ApiResponse.FailResponse("Only JPG, PNG, WEBP and GIF images are allowed."));
             }
 
-            url = $"/{relativeFolder}/{safeName}";
-            fileName = file.FileName;
-            fileType = file.ContentType;
+            var clinicId = HttpContext.Items["ClinicId"]?.ToString() ?? patient.ClinicId;
+            await using (var stream = file.OpenReadStream())
+            {
+                url = await _files.SaveAsync(stream, "photos", clinicId, extension, HttpContext.RequestAborted);
+            }
+
+            fileName = Path.GetFileName(file.FileName);
+            fileType = normalizedType;
         }
         else if (string.IsNullOrEmpty(form.BeforePhotoUrl) && string.IsNullOrEmpty(form.AfterPhotoUrl))
         {
@@ -224,8 +246,8 @@ public class PhotosController : ControllerBase
             .Select(p => new BeforeAfterComparisonResponse
             {
                 PhotoId = p.Id,
-                BeforePhotoUrl = p.BeforePhotoUrl ?? (p.Category == PhotoCategory.PreTreatment ? p.Url : null),
-                AfterPhotoUrl = p.AfterPhotoUrl ?? (p.Category == PhotoCategory.PostTreatment ? p.Url : null),
+                BeforePhotoUrl = p.BeforePhotoUrl ?? (p.Category == PhotoCategory.PreTreatment ? FileUrlFor(p) : null),
+                AfterPhotoUrl = p.AfterPhotoUrl ?? (p.Category == PhotoCategory.PostTreatment ? FileUrlFor(p) : null),
                 ComparisonScore = p.ComparisonScore,
                 Category = p.Category,
                 VisitDate = p.VisitDate,
@@ -291,12 +313,15 @@ public class PhotosController : ControllerBase
         return Ok(ApiResponse.SuccessResponse("Photo deleted"));
     }
 
-    private static PhotoResponse ToResponse(Photo p) => new()
+    private string? FileUrlFor(Photo p) =>
+        string.IsNullOrEmpty(p.Url) ? null : _signer.CreateUrl("photos", p.Id);
+
+    private PhotoResponse ToResponse(Photo p) => new()
     {
         Id = p.Id,
         PatientId = p.PatientId,
         DoctorId = p.DoctorId,
-        Url = p.Url,
+        Url = FileUrlFor(p) ?? string.Empty,
         FileName = p.FileName,
         FileType = p.FileType,
         FileSize = p.FileSize,

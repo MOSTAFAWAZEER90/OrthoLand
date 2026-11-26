@@ -3,6 +3,8 @@
   <ItemGroup>
     <ProjectReference Include="..\OrthoFlowAI.Application\OrthoFlowAI.Application.csproj" />
     <ProjectReference Include="..\OrthoFlowAI.Infrastructure\OrthoFlowAI.Infrastructure.csproj" />
+    <!-- The API runs inside this app (single-site deployment). -->
+    <ProjectReference Include="..\OrthoFlowAI.Api\OrthoFlowAI.Api.csproj" AdditionalProperties="OrthoFlowHostedInWeb=true" />
     <ProjectReference Include="..\OrthoFlowAI.Domain\OrthoFlowAI.Domain.csproj" />
   </ItemGroup>
 
@@ -16,5 +18,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="OrthoFlowAI.Tests" />
+  </ItemGroup>
 
 </Project>

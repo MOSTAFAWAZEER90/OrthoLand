@@ -1,8 +1,8 @@
 @page "/appointments"
-@rendermode InteractiveServer
 @inject IApiService ApiService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject PatientActions Actions
 
 <PageTitle>Appointments - OrthoFlowAI</PageTitle>
 
@@ -127,6 +127,13 @@ else
                                     @appt.Type - Dr. @appt.DoctorName
                                 </MudText>
                             </div>
+                            @* span stops the click from also opening the appointment details *@
+                            <span @onclick:stopPropagation="true">
+                                <MudTooltip Text="تذكير واتساب">
+                                    <MudIconButton Icon="@Icons.Custom.Brands.WhatsApp" Size="Size.Small" Style="color:#25D366;"
+                                                   OnClick="@(() => Actions.WhatsAppAsync("appointments", appt.Id))" />
+                                </MudTooltip>
+                            </span>
                             <MudChip T="string" Size="Size.Small" Style="@GetStatusChipStyle(appt.Status)">
                                 @appt.Status
                             </MudChip>
@@ -168,8 +175,9 @@ else
             {
                 PageNumber = 1,
                 PageSize = 200,
+                // Month boundaries in clinic time; ApiService converts them to UTC for the API.
                 DateFrom = new DateTime(_currentMonth.Year, _currentMonth.Month, 1),
-                DateTo = new DateTime(_currentMonth.Year, _currentMonth.Month, 1).AddMonths(1).AddDays(-1),
+                DateTo = new DateTime(_currentMonth.Year, _currentMonth.Month, 1).AddMonths(1).AddTicks(-1),
                 Status = _statusFilter
             };
 

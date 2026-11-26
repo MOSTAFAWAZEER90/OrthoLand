@@ -20,7 +20,7 @@ public class PatientService : IPatientService
     {
         var patients = await _unitOfWork.Patients.FindAsync(
             p => p.Id == id,
-            p => p.Doctor!,
+            p => p.Doctor!.User,
             p => p.Branch!,
             p => p.Clinic!);
 
@@ -43,7 +43,8 @@ public class PatientService : IPatientService
             pageNumber,
             pageSize,
             filter,
-            q => q.OrderByDescending(p => p.CreatedAt));
+            q => q.OrderByDescending(p => p.CreatedAt),
+            p => p.Doctor!.User); // for DoctorName in the list
 
         return ApiResponse<PagedResult<Patient>>.SuccessResponse(result);
     }
