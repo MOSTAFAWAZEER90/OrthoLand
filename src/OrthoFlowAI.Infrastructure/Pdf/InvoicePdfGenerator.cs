@@ -33,17 +33,30 @@ public static class InvoicePdfGenerator
         // QuestPDF Community licence: free for businesses under USD 1M annual revenue.
         QuestPDF.Settings.License = LicenseType.Community;
 
-        // The bundled default font (Lato) has no Arabic glyphs. Font files placed next to
-        // the app (e.g. a Fonts/*.ttf) are registered automatically; system fonts are used
-        // as well (Windows: Segoe UI/Arial, Linux image: fonts-noto-core).
+        // The bundled default font (Lato) has no Arabic glyphs, and hosting servers often
+        // have no Arabic font either, so Noto Sans Arabic (SIL OFL) ships inside this
+        // assembly. System fonts stay enabled only as a last fallback.
         QuestPDF.Settings.UseSystemFonts = true;
-        // Use the first available family from FontFamilies instead of failing.
         QuestPDF.Settings.ThrowOnMissingFontFamilies = false;
+        RegisterEmbeddedFonts();
     }
 
-    // Fonts tried in order; the first that has Arabic glyphs on the machine is used
-    // (Windows: Segoe UI / Arial, Linux containers: Noto from fonts-noto-core).
-    private static readonly string[] FontFamilies = { "Segoe UI", "Arial", "Noto Sans Arabic", "Noto Naskh Arabic", "DejaVu Sans" };
+    public const string ArabicFont = "Noto Sans Arabic";
+
+    // Per glyph, the first family that has it is used: Arabic from the embedded Noto font,
+    // Latin letters from Lato (bundled with QuestPDF), then any system font.
+    private static readonly string[] FontFamilies = { ArabicFont, "Lato", "Segoe UI", "Arial", "DejaVu Sans" };
+
+    private static void RegisterEmbeddedFonts()
+    {
+        var assembly = typeof(InvoicePdfGenerator).Assembly;
+        foreach (var name in assembly.GetManifestResourceNames()
+                     .Where(n => n.StartsWith("OrthoFlowAI.Fonts.", StringComparison.Ordinal) && n.EndsWith(".ttf", StringComparison.OrdinalIgnoreCase)))
+        {
+            using var stream = assembly.GetManifestResourceStream(name)!;
+            QuestPDF.Drawing.FontManager.RegisterFontFromStream(stream); // family name inside the file: "Noto Sans Arabic"
+        }
+    }
 
     public static byte[] Generate(InvoicePdfModel model)
     {

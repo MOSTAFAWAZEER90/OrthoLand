@@ -26,6 +26,11 @@
     <PackageReference Include="Google.Apis.Auth" Version="1.68.0" />
   </ItemGroup>
 
+  <!-- Arabic font embedded in the assembly so PDF invoices render Arabic on any server. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Pdf\Fonts\*.ttf" LogicalName="OrthoFlowAI.Fonts.%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

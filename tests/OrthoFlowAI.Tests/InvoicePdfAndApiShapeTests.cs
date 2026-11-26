@@ -42,6 +42,15 @@ public class InvoicePdfTests
     }
 
     [Fact]
+    public void Arabic_invoice_uses_the_embedded_arabic_font()
+    {
+        // The font ships inside the assembly, so Arabic renders even on servers without Arabic fonts.
+        var bytes = InvoicePdfGenerator.Generate(Model("ar"));
+
+        Assert.Contains("NotoSansArabic", Encoding.Latin1.GetString(bytes));
+    }
+
+    [Fact]
     public void Items_json_is_parsed_and_falls_back_to_a_single_line()
     {
         var lines = InvoicePdfGenerator.ParseItems("[{\"Description\":\"A\",\"Amount\":100},{\"name\":\"B\",\"price\":50}]", 0, "x");
