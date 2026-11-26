@@ -36,3 +36,7 @@ App_Data/
 
 ## Local tools (portable PostgreSQL etc.)
 .local/
+
+## Deployment settings with secrets (connection string, JWT key) - never commit
+**/appsettings.Production.json
+**/PublishProfiles/*.pubxml

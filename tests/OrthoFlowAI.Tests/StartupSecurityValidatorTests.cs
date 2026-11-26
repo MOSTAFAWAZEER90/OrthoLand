@@ -65,6 +65,14 @@ public class StartupSecurityValidatorTests
     }
 
     [Fact]
+    public void Demo_seed_data_is_allowed_on_an_explicitly_confirmed_demo_site()
+    {
+        var cfg = Config(("Jwt:SecretKey", StrongKey), ("ConnectionStrings:DefaultConnection", Db),
+                         ("Seed:DemoData", "true"), ("Seed:AllowDemoDataOutsideDevelopment", "true"));
+        Assert.Empty(StartupSecurityValidator.Validate(cfg, false));
+    }
+
+    [Fact]
     public void Missing_connection_string_fails()
     {
         var cfg = Config(("Jwt:SecretKey", StrongKey));

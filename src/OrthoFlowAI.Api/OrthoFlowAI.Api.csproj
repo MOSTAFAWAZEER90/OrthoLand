@@ -25,4 +25,10 @@
     <ProjectReference Include="..\OrthoFlowAI.Domain\OrthoFlowAI.Domain.csproj" />
   </ItemGroup>
 
+  <!-- When the Web app hosts the API, the Web's own appsettings*.json (which contain the
+       API settings too) are used; don't copy the API's files over them. -->
+  <ItemGroup Condition="'$(OrthoFlowHostedInWeb)' == 'true'">
+    <Content Update="appsettings*.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
 </Project>

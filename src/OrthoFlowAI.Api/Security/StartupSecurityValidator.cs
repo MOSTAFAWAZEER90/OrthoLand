@@ -44,8 +44,12 @@ public static class StartupSecurityValidator
         if (string.IsNullOrWhiteSpace(configuration.GetConnectionString("DefaultConnection")))
             errors.Add("ConnectionStrings:DefaultConnection is not set.");
 
-        if (!isDevelopment && configuration.GetValue<bool>("Seed:DemoData"))
-            errors.Add("Seed:DemoData must not be enabled outside Development (it creates accounts with well-known passwords).");
+        // Demo data creates accounts with well-known passwords. Outside Development it is only
+        // allowed when explicitly confirmed (a demo/test site), never by accident.
+        if (!isDevelopment && configuration.GetValue<bool>("Seed:DemoData")
+            && !configuration.GetValue<bool>("Seed:AllowDemoDataOutsideDevelopment"))
+            errors.Add("Seed:DemoData must not be enabled outside Development (it creates accounts with well-known passwords). " +
+                       "For a demo site, also set Seed:AllowDemoDataOutsideDevelopment=true.");
 
         return errors;
     }
